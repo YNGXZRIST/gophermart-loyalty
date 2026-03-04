@@ -7,6 +7,7 @@ import (
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/handler/api"
 	"gophermart-loyalty/internal/gopherman/router"
+	"gophermart-loyalty/migrations"
 	"log"
 	"net/http"
 	"os"
@@ -21,6 +22,10 @@ func run(args []string) error {
 	cfg, err := server.NewConfig(args)
 	if err != nil {
 		return fmt.Errorf("error creating config: %w", err)
+	}
+	err = migrations.Migrate(cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("error migrating database: %w", err)
 	}
 	dbConfig := db.NewCfg(cfg.DatabaseURL)
 	newConn, err := conn.NewConn(dbConfig)

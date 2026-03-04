@@ -24,11 +24,11 @@ func GetRouter(handler *api.Handler) *chi.Mux {
 				rU.Group(func(rUserAuth chi.Router) {
 					rUserAuth.Use(middleware.Authenticate)
 					rUserAuth.Route("/orders", func(rUOrders chi.Router) {
-						rUOrders.Get("", handler.GetOrders)
-						rUOrders.Post("", handler.AddOrder)
+						rUOrders.Get("/", handler.GetOrders)
+						rUOrders.Post("/", handler.AddOrder)
 					})
 					rUserAuth.Route("/balance", func(rUBalance chi.Router) {
-						rUBalance.Get("", handler.GetBalance)
+						rUBalance.Get("/", handler.GetBalance)
 						rUBalance.Post("/withdraw", handler.MakeWithdraw)
 					})
 					rUserAuth.Get("/withdrawals", handler.GetWithdrawals)
