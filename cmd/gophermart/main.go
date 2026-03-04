@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"gophermart-loyalty/internal/gopherman/config/db"
 	"gophermart-loyalty/internal/gopherman/config/server"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/handler/api"
+	"gophermart-loyalty/internal/gopherman/logger"
 	"gophermart-loyalty/internal/gopherman/router"
 	"gophermart-loyalty/migrations"
 	"log"
@@ -23,6 +25,10 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("error creating config: %w", err)
 	}
+	lgr, err := logger.Initialize(cfg.Mode, constant.ServerType)
+	if err != nil {
+		return fmt.Errorf("error initializing logger: %w", err)
+	}
 	err = migrations.Migrate(cfg.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("error migrating database: %w", err)
@@ -32,10 +38,10 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("error creating database connection: %w", err)
 	}
-	newHandler := api.NewHandler(newConn)
+	newHandler := api.NewHandler(newConn, lgr)
 	if err := http.ListenAndServe(cfg.Address, router.GetRouter(newHandler)); err != nil {
 		return fmt.Errorf("error starting HTTP server: %w", err)
 	}
-	fmt.Println(newConn)
+
 	return nil
 }

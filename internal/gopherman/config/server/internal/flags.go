@@ -3,6 +3,7 @@ package internal
 import (
 	"flag"
 	"fmt"
+	"gophermart-loyalty/internal/gopherman/constant"
 
 	"github.com/caarlos0/env/v11"
 )
@@ -11,6 +12,7 @@ type Options struct {
 	Address        string `env:"RUN_ADDRESS"`
 	DatabaseURL    string `env:"DATABASE_URI"`
 	AccrualAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
+	Mode           string `env:"MODE"`
 }
 
 func NewOptions(args []string) (*Options, error) {
@@ -29,7 +31,8 @@ func parseArgs(args []string) (*Options, error) {
 	opt := new(Options)
 	flags.StringVar(&opt.Address, "a", "localhost", "Address of the server")
 	flags.StringVar(&opt.DatabaseURL, "d", "", "Database URL")
-	flags.StringVar(&opt.DatabaseURL, "db", "", "Address of accrual server")
+	flags.StringVar(&opt.AccrualAddress, "r", "", "Address of accrual server")
+	flags.StringVar(&opt.Mode, "m", constant.TypeModeDefault, "Server mode")
 	err := flags.Parse(args)
 	if err != nil {
 		return nil, err
