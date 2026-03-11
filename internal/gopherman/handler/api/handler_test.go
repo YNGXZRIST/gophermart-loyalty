@@ -16,9 +16,10 @@ import (
 var _ repository.UserRepository = (*mockUserRepo)(nil)
 
 type mockUserRepo struct {
-	getByLogin    func(ctx context.Context, login string) (*model.User, error)
-	register      func(ctx context.Context, login, pass, ip string) (*model.User, error)
-	createSession func(ctx context.Context, uid int64, ip string) (string, error)
+	getByLogin     func(ctx context.Context, login string) (*model.User, error)
+	register       func(ctx context.Context, login, pass, ip string) (*model.User, error)
+	createSession  func(ctx context.Context, uid int64, ip string) (string, error)
+	isValidSession func(ctx context.Context, token string) (bool, error)
 }
 
 func (m *mockUserRepo) GetByLogin(ctx context.Context, login string) (*model.User, error) {
@@ -40,6 +41,13 @@ func (m *mockUserRepo) CreateSession(ctx context.Context, uid int64, ip string) 
 		return m.createSession(ctx, uid, ip)
 	}
 	return "", nil
+}
+
+func (m *mockUserRepo) IsValidSession(ctx context.Context, token string) (bool, error) {
+	if m.isValidSession != nil {
+		return m.isValidSession(ctx, token)
+	}
+	return false, nil
 }
 
 func TestHandler_Register(t *testing.T) {

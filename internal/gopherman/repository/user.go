@@ -19,6 +19,7 @@ type UserRepository interface {
 	GetByLogin(ctx context.Context, login string) (*model.User, error)
 	Register(ctx context.Context, login, pass, ip string) (*model.User, error)
 	CreateSession(ctx context.Context, uid int64, ip string) (string, error)
+	IsValidSession(ctx context.Context, token string) (bool, error)
 }
 
 type userRepo struct {
@@ -110,8 +111,9 @@ func (r *userRepo) IsValidSession(ctx context.Context, token string) (bool, erro
 	cache, err := r.sessions.Get(ctx, tokenHash)
 	if err == nil {
 		if !cache.ExpiresAt.After(time.Now()) {
-			return true, nil
+			return false, nil
 		}
+		return true, nil
 	}
 	var dbSession model.Sessions
 	var ipNull sql.NullString
@@ -120,7 +122,7 @@ func (r *userRepo) IsValidSession(ctx context.Context, token string) (bool, erro
 		tokenHash).Scan(&dbSession.UserID, &dbSession.ExpiresAt, &ipNull, &dbSession.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return true, nil
+			return false, nil
 		}
 		return false, err
 	}
