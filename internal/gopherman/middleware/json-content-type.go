@@ -10,7 +10,6 @@ func ContentTypeJSON(next http.Handler) http.Handler {
 		res := r.Header.Get(constant.ContentTypeHeader)
 		if res != constant.ApplicationJSON {
 			w.WriteHeader(http.StatusUnsupportedMediaType)
-
 			return
 		}
 		w.Header().Set(constant.ContentTypeHeader, constant.ApplicationJSON)

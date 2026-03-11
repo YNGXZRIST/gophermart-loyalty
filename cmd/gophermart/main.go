@@ -8,6 +8,7 @@ import (
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/handler/api"
 	"gophermart-loyalty/internal/gopherman/logger"
+	"gophermart-loyalty/internal/gopherman/repository"
 	"gophermart-loyalty/internal/gopherman/router"
 	"gophermart-loyalty/migrations"
 	"log"
@@ -38,7 +39,8 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("error creating database connection: %w", err)
 	}
-	newHandler := api.NewHandler(newConn, lgr)
+	userRepo := repository.NewUserRepository(newConn)
+	newHandler := api.NewHandler(userRepo, lgr)
 	if err := http.ListenAndServe(cfg.Address, router.GetRouter(newHandler)); err != nil {
 		return fmt.Errorf("error starting HTTP server: %w", err)
 	}

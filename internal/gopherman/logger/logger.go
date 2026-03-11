@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gophermart-loyalty/internal/gopherman/constant"
 	"os"
+	"strings"
 
 	"go.uber.org/zap"
 )
@@ -14,11 +15,11 @@ const logDir = "logs/"
 func Initialize(mode, cmdType string) (*zap.Logger, error) {
 	var err error
 	var log *zap.Logger
+	mode = strings.TrimSpace(mode)
 	switch mode {
 	case constant.TypeModeProduction:
 		log, err = createProductionLogger(cmdType)
-	case constant.TypeModeDevelopment:
-	case constant.TypeModeTest:
+	case constant.TypeModeDevelopment, constant.TypeModeTest:
 		log, err = createDevelopmentLogger()
 	default:
 		err = errors.New("invalid mode")

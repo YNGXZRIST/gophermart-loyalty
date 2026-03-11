@@ -12,18 +12,17 @@ func GetRouter(handler *api.Handler) *chi.Mux {
 	r := chi.NewRouter()
 	r.Group(func(r chi.Router) {
 		r.Use(mChi.RequestID)
-		r.Use(mChi.RealIP)
 		r.Use(mChi.StripSlashes)
 		r.Use(middleware.GzipCompressor)
 		r.Route("/api", func(rApi chi.Router) {
 
 			rApi.Use(mChi.RequestID)
-			rApi.Use(mChi.RealIP)
-
 			rApi.Route("/user", func(rU chi.Router) {
-
-				rU.Post("/register", handler.Register)
-				rU.Post("/login", handler.Login)
+				rU.Group(func(rJson chi.Router) {
+					rJson.Use(middleware.ContentTypeJSON)
+					rJson.Post("/register", handler.Register)
+					rJson.Post("/login", handler.Login)
+				})
 
 				rU.Group(func(rUserAuth chi.Router) {
 					rUserAuth.Use(middleware.Authenticate)

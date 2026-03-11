@@ -1,19 +1,19 @@
 package api
 
 import (
-	"gophermart-loyalty/internal/gopherman/db/conn"
+	"gophermart-loyalty/internal/gopherman/repository"
 
 	"go.uber.org/zap"
 )
 
 type Handler struct {
-	conn *conn.DB
-	lgr  *zap.Logger
+	userRepo repository.UserRepository
+	lgr      *zap.Logger
 }
 
-func NewHandler(conn *conn.DB, lgr *zap.Logger) *Handler {
+func NewHandler(userRepo repository.UserRepository, lgr *zap.Logger) *Handler {
 	return &Handler{
-		conn: conn,
-		lgr:  lgr,
+		userRepo: userRepo,
+		lgr:      lgr,
 	}
 }
