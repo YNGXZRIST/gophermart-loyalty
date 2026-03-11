@@ -30,9 +30,9 @@ func NewOptions(args []string) (*Options, error) {
 }
 func (opt *Options) parseArgs(args []string) error {
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
-	flags.StringVar(&opt.Address, "a", "localhost", "Address of the server")
-	flags.StringVar(&opt.DatabaseURL, "d", "", "Database URL")
-	flags.StringVar(&opt.AccrualAddress, "r", "", "Address of accrual server")
+	flags.StringVar(&opt.Address, "a", opt.Address, "Address of the server")
+	flags.StringVar(&opt.DatabaseURL, "d", opt.DatabaseURL, "Database URL")
+	flags.StringVar(&opt.AccrualAddress, "r", opt.AccrualAddress, "Address of accrual server")
 	flags.StringVar(&opt.Mode, "m", constant.TypeModeDefault, "Server mode")
 	err := flags.Parse(args)
 	if err != nil {
