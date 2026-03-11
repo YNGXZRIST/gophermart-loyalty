@@ -4,5 +4,6 @@ const (
 	TypeModeProduction  = "production"
 	TypeModeDevelopment = "development"
 	TypeModeDefault
-	TypeModeTest = "test"
+	TypeModeTest              = "test"
+	AccrualWorkerCountDefault = 10
 )

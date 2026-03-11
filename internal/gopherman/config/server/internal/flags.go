@@ -9,10 +9,11 @@ import (
 )
 
 type Options struct {
-	Address        string `env:"RUN_ADDRESS"`
-	DatabaseURL    string `env:"DATABASE_URI"`
-	AccrualAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
-	Mode           string `env:"MODE"`
+	Address            string `env:"RUN_ADDRESS"`
+	DatabaseURL        string `env:"DATABASE_URI"`
+	AccrualAddress     string `env:"ACCRUAL_SYSTEM_ADDRESS"`
+	Mode               string `env:"MODE"`
+	AccrualWorkerCount int    `env:"ACCRUAL_WORKER_COUNT"`
 }
 
 func NewOptions(args []string) (*Options, error) {
@@ -34,6 +35,7 @@ func (opt *Options) parseArgs(args []string) error {
 	flags.StringVar(&opt.DatabaseURL, "d", opt.DatabaseURL, "Database URL")
 	flags.StringVar(&opt.AccrualAddress, "r", opt.AccrualAddress, "Address of accrual server")
 	flags.StringVar(&opt.Mode, "m", constant.TypeModeDefault, "Server mode")
+	flags.IntVar(&opt.AccrualWorkerCount, "ac", constant.AccrualWorkerCountDefault, "Worker accrual count")
 	err := flags.Parse(args)
 	if err != nil {
 		return err
