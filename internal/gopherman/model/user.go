@@ -9,7 +9,9 @@ type User struct {
 	ID        int64
 	Login     string
 	Pass      string
-	LastIp    string
+	LastIP    string
+	Balance   float64
+	Withdrawn float64
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -17,6 +19,10 @@ type User struct {
 type RegisterRequest struct {
 	Login string `json:"login"`
 	Pass  string `json:"password"`
+}
+type BalanceResponse struct {
+	Current   float64 `json:"current"`
+	Withdrawn float64 `json:"withdrawn"`
 }
 
 func (r *RegisterRequest) Validate() error {
@@ -27,8 +33,4 @@ func (r *RegisterRequest) Validate() error {
 		return errors.New("password too short")
 	}
 	return nil
-}
-
-func (r *RegisterRequest) ToUser() User {
-	return User{Login: r.Login, Pass: r.Pass}
 }

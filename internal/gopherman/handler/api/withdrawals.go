@@ -1,8 +1,32 @@
 package api
 
-import "net/http"
+import (
+	"gophermart-loyalty/internal/gopherman/contextkey"
+	"gophermart-loyalty/internal/gopherman/service"
+	"net/http"
+
+	"go.uber.org/zap"
+)
 
 func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
-	//TODO: make handler
-	return
+	userID, ok := contextkey.UserIDFromContext(r.Context())
+	if !ok || userID == 0 {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	res := h.ser.GetWithdrawals(r.Context(), service.GetWithdrawalsInput{UserID: userID})
+	if res.Err != nil {
+		h.lgr.Info("get orders error", zap.String("error", res.Err.Error()))
+		w.WriteHeader(res.Code)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	bytes, err := service.WithdrawalsJSON(res.Withdrawals)
+	if err != nil {
+		h.lgr.Info("get orders error", zap.String("error", res.Err.Error()))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(bytes)
 }

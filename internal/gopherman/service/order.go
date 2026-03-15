@@ -26,16 +26,8 @@ type AddOrderInput struct {
 	OrderID string
 }
 
-func GetOrders(ctx context.Context, repo repository.OrderRepository, in GetOrdersInput) GetOrdersResponse {
-	if in.UserID == 0 {
-		return GetOrdersResponse{
-			Response: Response{
-				Code: http.StatusUnauthorized,
-				Err:  errors.New("user not authorized"),
-			},
-		}
-	}
-	orders, err := repo.GetByUserID(ctx, in.UserID)
+func (s *Service) GetOrders(ctx context.Context, in GetOrdersInput) GetOrdersResponse {
+	orders, err := s.Rep.Order.GetByUserID(ctx, in.UserID)
 	if err != nil {
 		return GetOrdersResponse{
 			Response: Response{
@@ -50,7 +42,7 @@ func GetOrders(ctx context.Context, repo repository.OrderRepository, in GetOrder
 	}
 }
 
-func AddOrder(ctx context.Context, repo repository.OrderRepository, in AddOrderInput) Response {
+func (s *Service) AddOrder(ctx context.Context, in AddOrderInput) Response {
 	orderID := strings.TrimSpace(in.OrderID)
 	if orderID == "" {
 		return Response{
@@ -64,13 +56,7 @@ func AddOrder(ctx context.Context, repo repository.OrderRepository, in AddOrderI
 			Err:  errors.New("invalid order number"),
 		}
 	}
-	if in.UserID == 0 {
-		return Response{
-			Code: http.StatusUnauthorized,
-			Err:  errors.New("user not authorized"),
-		}
-	}
-	err := repo.Add(ctx, in.UserID, orderID)
+	err := s.Rep.Order.Add(ctx, in.UserID, orderID)
 	if err != nil {
 		if errors.Is(err, repository.ErrOrderExistsOwn) {
 			return Response{Code: http.StatusOK}

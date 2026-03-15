@@ -44,9 +44,12 @@ func run(args []string) error {
 	ctx := context.Background()
 	accrualClient := accrual.NewClient(ctx, newConn, cfg)
 	go accrualClient.StartPoolAccrual(ctx)
-	userRepo := repository.NewUserRepository(newConn)
-	orderRepo := repository.NewOrderRepository(newConn)
-	newHandler := api.NewHandler(userRepo, orderRepo, lgr)
+	repos := repository.Repositories{
+		User:       repository.NewUserRepository(newConn),
+		Order:      repository.NewOrderRepository(newConn),
+		Withdrawal: repository.NewWithdrawalRepository(newConn),
+	}
+	newHandler := api.NewHandler(newConn, repos, lgr)
 	if err := http.ListenAndServe(cfg.Address, router.GetRouter(newHandler)); err != nil {
 		return fmt.Errorf("error starting HTTP server: %w", err)
 	}

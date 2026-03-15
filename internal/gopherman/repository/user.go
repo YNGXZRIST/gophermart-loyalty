@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"gophermart-loyalty/internal/gopherman/auth/password"
 	"gophermart-loyalty/internal/gopherman/auth/session"
@@ -21,61 +20,64 @@ type UserRepository interface {
 	Register(ctx context.Context, login, pass, ip string) (*model.User, error)
 	CreateSession(ctx context.Context, uid int64, ip string) (string, error)
 	UserIDFromSession(ctx context.Context, token string) (int64, error)
+	IncrementWithdrawn(ctx context.Context, tx *conn.Tx, w *model.Withdrawal) error
 }
 
 type userRepo struct {
-	db       *conn.DB
-	users    *storage.MemStorage[string, *model.User]
-	sessions *storage.MemStorage[string, *model.Sessions]
+	db        *conn.DB
+	loginToID *storage.MemStorage[string, int64]
+	usersByID *storage.MemStorage[int64, *model.User]
+	sessions  *storage.MemStorage[string, *model.Sessions]
 }
 
 func NewUserRepository(db *conn.DB) UserRepository {
-	users := storage.NewMemStorage[string, *model.User]()
+	loginToID := storage.NewMemStorage[string, int64]()
+	usersByID := storage.NewMemStorage[int64, *model.User]()
 	sessStorage := storage.NewMemStorage[string, *model.Sessions]()
-	return &userRepo{db: db, users: users, sessions: sessStorage}
+	return &userRepo{db: db, loginToID: loginToID, usersByID: usersByID, sessions: sessStorage}
 }
 
 func (r *userRepo) GetByLogin(ctx context.Context, login string) (*model.User, error) {
-	u, err := r.users.Get(ctx, login)
+	if id, err := r.loginToID.Get(ctx, login); err == nil {
+		return r.GetByID(ctx, id)
+	}
+	var dbUser model.User
+	var lastIP sql.NullString
+	err := r.db.DB.QueryRowContext(ctx,
+		"SELECT id, login, pass, created_at, updated_at, last_login_ip, balance, withdrawn FROM users WHERE login=$1",
+		login,
+	).Scan(&dbUser.ID, &dbUser.Login, &dbUser.Pass, &dbUser.CreatedAt, &dbUser.UpdatedAt, &lastIP, &dbUser.Balance, &dbUser.Withdrawn)
+	if err != nil {
+		return nil, err
+	}
+	if lastIP.Valid {
+		dbUser.LastIP = lastIP.String
+	}
+	_ = r.loginToID.Set(ctx, login, dbUser.ID)
+	_ = r.usersByID.Set(ctx, dbUser.ID, &dbUser)
+	return &dbUser, nil
+}
+
+func (r *userRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
+	u, err := r.usersByID.Get(ctx, id)
 	if err == nil {
 		return u, nil
 	}
 	var dbUser model.User
 	var lastIP sql.NullString
 	err = r.db.DB.QueryRowContext(ctx,
-		"SELECT id, login, pass, created_at, updated_at, last_login_ip FROM users WHERE login=$1",
-		login,
-	).Scan(&dbUser.ID, &dbUser.Login, &dbUser.Pass, &dbUser.CreatedAt, &dbUser.UpdatedAt, &lastIP)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	if lastIP.Valid {
-		dbUser.LastIp = lastIP.String
-	}
-	_ = r.users.Set(ctx, login, &dbUser)
-	return &dbUser, nil
-}
-
-func (r *userRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
-	var u model.User
-	var lastIP sql.NullString
-	err := r.db.DB.QueryRowContext(ctx,
-		"SELECT id, login, pass, created_at, updated_at, last_login_ip FROM users WHERE id=$1",
+		"SELECT id, login, pass, created_at, updated_at, last_login_ip, balance, withdrawn FROM users WHERE id=$1",
 		id,
-	).Scan(&u.ID, &u.Login, &u.Pass, &u.CreatedAt, &u.UpdatedAt, &lastIP)
+	).Scan(&dbUser.ID, &dbUser.Login, &dbUser.Pass, &dbUser.CreatedAt, &dbUser.UpdatedAt, &lastIP, &dbUser.Balance, &dbUser.Withdrawn)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
 		return nil, err
 	}
 	if lastIP.Valid {
-		u.LastIp = lastIP.String
+		dbUser.LastIP = lastIP.String
 	}
-	return &u, nil
+	_ = r.loginToID.Set(ctx, dbUser.Login, dbUser.ID)
+	_ = r.usersByID.Set(ctx, dbUser.ID, &dbUser)
+	return &dbUser, nil
 }
 
 func (r *userRepo) Register(ctx context.Context, login, pass, ip string) (*model.User, error) {
@@ -93,17 +95,25 @@ func (r *userRepo) Register(ctx context.Context, login, pass, ip string) (*model
 		return nil, fmt.Errorf("could not insert user: %w", err)
 	}
 	if lastIP.Valid {
-		u.LastIp = lastIP.String
+		u.LastIP = lastIP.String
 	}
-	_ = r.users.Set(ctx, login, &u)
-
+	_ = r.loginToID.Set(ctx, login, u.ID)
+	_ = r.usersByID.Set(ctx, u.ID, &u)
 	return &u, nil
 }
-func (r *userRepo) UpdateLastIp(ctx context.Context, uid int64, ip string) error {
-	_, err := r.db.QueryContext(ctx, "UPDATE users SET last_login_ip=$1 where id=$2", ip, uid)
-	return err
+func (r *userRepo) UpdateLastIP(ctx context.Context, userID int64, ip string) error {
+	u, err := r.GetByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("could not update last ip: %w", err)
+	}
+	_, err = r.db.ExecContext(ctx, "UPDATE users SET last_login_ip=$1 where id=$2", ip, userID)
+	if err != nil {
+		return fmt.Errorf("could not update last ip: %w", err)
+	}
+	u.LastIP = ip
+	return nil
 }
-func (r *userRepo) CreateSession(ctx context.Context, uid int64, ip string) (string, error) {
+func (r *userRepo) CreateSession(ctx context.Context, userID int64, ip string) (string, error) {
 	token, err := session.GenerateToken()
 	if err != nil {
 		return "", fmt.Errorf("generate token: %w", err)
@@ -111,17 +121,20 @@ func (r *userRepo) CreateSession(ctx context.Context, uid int64, ip string) (str
 	hash := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(hash[:])
 	expiresAt := time.Now().Add(24 * time.Hour)
-
+	err = r.UpdateLastIP(ctx, userID, ip)
+	if err != nil {
+		return "", err
+	}
 	_, err = r.db.ExecContext(ctx,
 		`INSERT INTO sessions (token_hash, user_id, expires_at, ip) VALUES ($1, $2, $3, $4)
 		 ON CONFLICT (user_id, ip) DO UPDATE SET
 		   token_hash = EXCLUDED.token_hash,
 		   expires_at = EXCLUDED.expires_at`,
-		tokenHash, uid, expiresAt, ip)
+		tokenHash, userID, expiresAt, ip)
 	if err != nil {
 		return "", fmt.Errorf("upsert session: %w", err)
 	}
-	_ = r.sessions.Set(ctx, tokenHash, &model.Sessions{UserID: uid, TokenHash: tokenHash, ExpiresAt: expiresAt, IP: ip})
+	_ = r.sessions.Set(ctx, tokenHash, &model.Sessions{UserID: userID, TokenHash: tokenHash, ExpiresAt: expiresAt, IP: ip})
 	return token, nil
 }
 
@@ -141,9 +154,6 @@ func (r *userRepo) UserIDFromSession(ctx context.Context, token string) (int64, 
 		"SELECT user_id, expires_at, ip, created_at FROM sessions WHERE token_hash = $1 AND expires_at > CURRENT_TIMESTAMP",
 		tokenHash).Scan(&dbSession.UserID, &dbSession.ExpiresAt, &ipNull, &dbSession.CreatedAt)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, nil
-		}
 		return 0, err
 	}
 	if ipNull.Valid {
@@ -152,4 +162,24 @@ func (r *userRepo) UserIDFromSession(ctx context.Context, token string) (int64, 
 	dbSession.TokenHash = tokenHash
 	_ = r.sessions.Set(ctx, tokenHash, &dbSession)
 	return dbSession.UserID, nil
+}
+func (r *userRepo) IncrementWithdrawn(ctx context.Context, tx *conn.Tx, w *model.Withdrawal) error {
+	u, err := r.GetByID(ctx, w.UserID)
+	if err != nil {
+		return err
+	}
+	u.Balance -= w.Sum
+	u.Withdrawn += w.Sum
+	_, err = tx.ExecContext(ctx,
+		`UPDATE users SET balance = $1,withdrawn = $2  WHERE id = $3`,
+		u.Balance, u.Withdrawn, u.ID)
+	if err != nil {
+		return fmt.Errorf("update user db error: %w", err)
+	}
+	err = r.usersByID.Set(ctx, u.ID, u)
+	if err != nil {
+		return fmt.Errorf("update user memory error: %w", err)
+	}
+
+	return nil
 }

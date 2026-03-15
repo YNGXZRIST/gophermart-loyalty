@@ -30,8 +30,5 @@ func Validate(str string) bool {
 		}
 		sum += d
 	}
-	if sum%10 == 0 {
-		return true
-	}
-	return false
+	return sum%10 == 0
 }

@@ -2,23 +2,24 @@ package api
 
 import (
 	"context"
+	"gophermart-loyalty/internal/gopherman/db/conn"
 	r "gophermart-loyalty/internal/gopherman/repository"
+	"gophermart-loyalty/internal/gopherman/service"
 	"strings"
 
 	"go.uber.org/zap"
 )
 
 type Handler struct {
-	userRepo  r.UserRepository
-	orderRepo r.OrderRepository
-	lgr       *zap.Logger
+	ser *service.Service
+	lgr *zap.Logger
 }
 
-func NewHandler(userRepo r.UserRepository, orderRepo r.OrderRepository, lgr *zap.Logger) *Handler {
+func NewHandler(conn *conn.DB, repos r.Repositories, lgr *zap.Logger) *Handler {
+	newService := service.NewService(conn, repos)
 	return &Handler{
-		userRepo:  userRepo,
-		orderRepo: orderRepo,
-		lgr:       lgr,
+		ser: newService,
+		lgr: lgr,
 	}
 }
 
@@ -27,5 +28,5 @@ func (h *Handler) UserIDFromRequest(ctx context.Context, token string) (int64, e
 	if token == "" {
 		return 0, nil
 	}
-	return h.userRepo.UserIDFromSession(ctx, token)
+	return h.ser.Rep.User.UserIDFromSession(ctx, token)
 }

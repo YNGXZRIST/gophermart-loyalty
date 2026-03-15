@@ -1,6 +1,7 @@
 package server
 
 import (
+	"gophermart-loyalty/internal/gopherman/constant"
 	"reflect"
 	"testing"
 )
@@ -23,6 +24,8 @@ func TestNewConfig(t *testing.T) {
 		want.Address = ":8080"
 		want.DatabaseURL = "postgres://localhost/gophermart"
 		want.AccrualAddress = "http://accrual:8080"
+		want.Mode = constant.TypeModeDefault
+		want.AccrualWorkerCount = constant.AccrualWorkerCountDefault
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("NewConfig() got = %+v, want %+v", got, want)
 		}

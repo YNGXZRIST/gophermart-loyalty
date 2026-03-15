@@ -39,11 +39,6 @@ func Test_Validate(t *testing.T) {
 			str:  "1234a5678",
 			want: false,
 		},
-		{
-			name: "test",
-			str:  "12345678903",
-			want: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

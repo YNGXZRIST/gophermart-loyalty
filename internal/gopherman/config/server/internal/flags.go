@@ -18,21 +18,32 @@ type Options struct {
 
 func NewOptions(args []string) (*Options, error) {
 	opt := new(Options)
-	err := opt.parseEnv()
-	if err != nil {
-		return nil, fmt.Errorf("ERROR: cannot parse environment variables: %w", err)
-	}
-	err = opt.parseArgs(args)
-	if err != nil {
+	if err := opt.parseArgs(args); err != nil {
 		return nil, fmt.Errorf("ERROR: cannot parse arguments: %w", err)
 	}
-
+	if err := opt.parseEnv(); err != nil {
+		return nil, fmt.Errorf("ERROR: cannot parse environment variables: %w", err)
+	}
 	return opt, nil
 }
+
+func parseArgs(args []string) (*Options, error) {
+	opt := &Options{
+		Address:            "localhost",
+		Mode:               constant.TypeModeDefault,
+		AccrualWorkerCount: constant.AccrualWorkerCountDefault,
+	}
+	if err := opt.parseArgs(args); err != nil {
+		return nil, err
+	}
+	return opt, nil
+}
+
 func (opt *Options) parseArgs(args []string) error {
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
 	flags.StringVar(&opt.Address, "a", opt.Address, "Address of the server")
 	flags.StringVar(&opt.DatabaseURL, "d", opt.DatabaseURL, "Database URL")
+	flags.StringVar(&opt.DatabaseURL, "db", opt.DatabaseURL, "Database URL (alias)")
 	flags.StringVar(&opt.AccrualAddress, "r", opt.AccrualAddress, "Address of accrual server")
 	flags.StringVar(&opt.Mode, "m", constant.TypeModeDefault, "Server mode")
 	flags.IntVar(&opt.AccrualWorkerCount, "ac", constant.AccrualWorkerCountDefault, "Worker accrual count")

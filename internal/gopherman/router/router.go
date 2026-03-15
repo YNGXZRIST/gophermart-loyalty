@@ -33,7 +33,10 @@ func GetRouter(handler *api.Handler) *chi.Mux {
 
 					rUserAuth.Route("/balance", func(rUBalance chi.Router) {
 						rUBalance.Get("/", handler.GetBalance)
-						rUBalance.Post("/withdraw", handler.MakeWithdraw)
+						rUBalance.Group(func(rMakeWithdraw chi.Router) {
+							rMakeWithdraw.Use(middleware.ContentTypeJSON)
+							rMakeWithdraw.Post("/withdraw", handler.MakeWithdraw)
+						})
 					})
 
 					rUserAuth.Get("/withdrawals", handler.GetWithdrawals)

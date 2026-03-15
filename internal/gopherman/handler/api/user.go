@@ -18,7 +18,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ip := strings.Split(r.RemoteAddr, ":")[0]
-	res := service.Register(ctx, h.userRepo, service.RegisterInput{
+	res := h.ser.Register(ctx, service.RegisterInput{
 		Req: req,
 		IP:  ip,
 	})
@@ -39,7 +39,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ip := strings.Split(r.RemoteAddr, ":")[0]
-	res := service.Login(ctx, h.userRepo, service.LoginInput{Req: req, IP: ip})
+	res := h.ser.Login(ctx, service.LoginInput{Req: req, IP: ip})
 	if res.Err != nil {
 		h.lgr.Info("login error", zap.String("error", res.Err.Error()))
 		w.WriteHeader(res.Code)

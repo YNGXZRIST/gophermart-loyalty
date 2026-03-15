@@ -29,17 +29,14 @@ func NewOrderRepository(db *conn.DB) OrderRepository {
 }
 
 func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	defer tx.Rollback()
-	_, err = r.db.ExecContext(ctx,
+	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO orders (user_id, order_id, status) VALUES ($1, $2, 'NEW')`,
 		userID, orderID)
-	if err == nil {
-		return tx.Commit()
-	}
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) || pgErr.Code != pgerrcode.UniqueViolation {
-		return err
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != pgerrcode.UniqueViolation {
+			return err
+		}
 	}
 	var ownerID int64
 	err = r.db.QueryRowContext(ctx, `SELECT user_id FROM orders WHERE order_id = $1`, orderID).Scan(&ownerID)
@@ -64,13 +61,14 @@ func (r *orderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Ord
 	var list []*model.Order
 	for rows.Next() {
 		var o model.Order
-		var accrual sql.NullInt64
+		var accrual sql.NullFloat64
+		o.UserID = userID
 		err = rows.Scan(&o.OrderID, &o.Status, &accrual, &o.CreatedAt, &o.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
 		if accrual.Valid {
-			v := int(accrual.Int64)
+			v := accrual.Float64
 			o.Accrual = &v
 		}
 		ord := o

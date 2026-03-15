@@ -5,6 +5,8 @@ import (
 	"gophermart-loyalty/internal/gopherman/service"
 	"io"
 	"net/http"
+
+	"go.uber.org/zap"
 )
 
 func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
@@ -13,13 +15,15 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	res := service.GetOrders(r.Context(), h.orderRepo, service.GetOrdersInput{UserID: userID})
+	res := h.ser.GetOrders(r.Context(), service.GetOrdersInput{UserID: userID})
 	if res.Err != nil {
+		h.lgr.Info("get orders error", zap.String("error", res.Err.Error()))
 		w.WriteHeader(res.Code)
 		return
 	}
 	data, err := service.OrdersJSON(res.Orders)
 	if err != nil {
+		h.lgr.Info("marshal error", zap.String("error", res.Err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -39,13 +43,12 @@ func (h *Handler) AddOrder(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	res := service.AddOrder(r.Context(), h.orderRepo, service.AddOrderInput{
+	res := h.ser.AddOrder(r.Context(), service.AddOrderInput{
 		UserID:  userID,
 		OrderID: string(body),
 	})
 	if res.Err != nil {
-		w.WriteHeader(res.Code)
-		return
+		h.lgr.Info("add order error", zap.String("error", res.Err.Error()))
 	}
 	w.WriteHeader(res.Code)
 }

@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"gophermart-loyalty/internal/gopherman/auth/password"
+	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/model"
 	"gophermart-loyalty/internal/gopherman/repository"
+	"gophermart-loyalty/internal/gopherman/service"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -56,6 +58,10 @@ func (m *mockUserRepo) UserIDFromSession(ctx context.Context, token string) (int
 		return m.userIDFromSession(ctx, token)
 	}
 	return 0, nil
+}
+
+func (m *mockUserRepo) IncrementWithdrawn(ctx context.Context, tx *conn.Tx, w *model.Withdrawal) error {
+	return nil
 }
 
 func TestHandler_Register(t *testing.T) {
@@ -165,7 +171,9 @@ func TestHandler_Register(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &Handler{userRepo: tt.mock, lgr: lgr}
+			repos := repository.Repositories{User: tt.mock, Order: nil, Withdrawal: nil}
+			svc := service.NewService(nil, repos)
+			h := &Handler{ser: svc, lgr: lgr}
 			req := httptest.NewRequest(http.MethodPost, "/api/user/register", bytes.NewBufferString(tt.body))
 			req.Header.Set("Content-Type", tt.contentType)
 			req.RemoteAddr = "192.168.1.1:12345"
@@ -280,7 +288,9 @@ func TestHandler_Login(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &Handler{userRepo: tt.mock, lgr: lgr}
+			repos := repository.Repositories{User: tt.mock, Order: nil, Withdrawal: nil}
+			svc := service.NewService(nil, repos)
+			h := &Handler{ser: svc, lgr: lgr}
 			req := httptest.NewRequest(http.MethodPost, "/api/user/login", bytes.NewBufferString(tt.body))
 			req.Header.Set("Content-Type", tt.contentType)
 			req.RemoteAddr = "192.168.1.1:12345"
