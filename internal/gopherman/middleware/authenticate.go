@@ -1,8 +1,10 @@
 package middleware
 
 import (
-	"gophermart-loyalty/internal/gopherman/handler/api"
 	"net/http"
+
+	"gophermart-loyalty/internal/gopherman/contextkey"
+	"gophermart-loyalty/internal/gopherman/handler/api"
 )
 
 func Authenticate(handler *api.Handler) func(next http.Handler) http.Handler {
@@ -13,16 +15,17 @@ func Authenticate(handler *api.Handler) func(next http.Handler) http.Handler {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
-			ok, err := handler.ValidateSession(r.Context(), raw)
+			userID, err := handler.UserIDFromRequest(r.Context(), raw)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			if !ok {
+			if userID == 0 {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
-			next.ServeHTTP(w, r)
+			ctx := contextkey.WithUserID(r.Context(), userID)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }

@@ -2,28 +2,30 @@ package api
 
 import (
 	"context"
-	"gophermart-loyalty/internal/gopherman/repository"
+	r "gophermart-loyalty/internal/gopherman/repository"
 	"strings"
 
 	"go.uber.org/zap"
 )
 
 type Handler struct {
-	userRepo repository.UserRepository
-	lgr      *zap.Logger
+	userRepo  r.UserRepository
+	orderRepo r.OrderRepository
+	lgr       *zap.Logger
 }
 
-func NewHandler(userRepo repository.UserRepository, lgr *zap.Logger) *Handler {
+func NewHandler(userRepo r.UserRepository, orderRepo r.OrderRepository, lgr *zap.Logger) *Handler {
 	return &Handler{
-		userRepo: userRepo,
-		lgr:      lgr,
+		userRepo:  userRepo,
+		orderRepo: orderRepo,
+		lgr:       lgr,
 	}
 }
 
-func (h *Handler) ValidateSession(ctx context.Context, token string) (bool, error) {
+func (h *Handler) UserIDFromRequest(ctx context.Context, token string) (int64, error) {
 	token = strings.TrimPrefix(token, "Bearer ")
 	if token == "" {
-		return false, nil
+		return 0, nil
 	}
-	return h.userRepo.IsValidSession(ctx, token)
+	return h.userRepo.UserIDFromSession(ctx, token)
 }

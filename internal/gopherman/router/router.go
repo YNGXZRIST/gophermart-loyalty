@@ -13,7 +13,6 @@ func GetRouter(handler *api.Handler) *chi.Mux {
 	r.Group(func(r chi.Router) {
 		r.Use(mChi.RequestID)
 		r.Use(mChi.StripSlashes)
-		r.Use(middleware.GzipCompressor)
 		r.Route("/api", func(rApi chi.Router) {
 			rApi.Route("/user", func(rU chi.Router) {
 				rU.Group(func(rJson chi.Router) {
@@ -25,8 +24,11 @@ func GetRouter(handler *api.Handler) *chi.Mux {
 				rU.Group(func(rUserAuth chi.Router) {
 					rUserAuth.Use(middleware.Authenticate(handler))
 					rUserAuth.Route("/orders", func(rUOrders chi.Router) {
-						rUOrders.Get("/", handler.GetOrders)
 						rUOrders.Post("/", handler.AddOrder)
+						rUOrders.Group(func(rUOrdersGet chi.Router) {
+							rUOrdersGet.Use(middleware.GzipCompressor)
+							rUOrdersGet.Get("/", handler.GetOrders)
+						})
 					})
 
 					rUserAuth.Route("/balance", func(rUBalance chi.Router) {

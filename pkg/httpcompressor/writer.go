@@ -41,8 +41,8 @@ func (c *CompressWriter) WriteHeader(statusCode int) {
 	if !c.wroteHeader {
 		c.w.Header().Set(ContentEncodingHeader, c.encoding)
 		c.wroteHeader = true
+		c.w.WriteHeader(statusCode)
 	}
-	c.w.WriteHeader(statusCode)
 }
 func (c *CompressWriter) Close() error {
 	return c.compressor.Close()

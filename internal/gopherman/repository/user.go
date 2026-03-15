@@ -17,9 +17,10 @@ import (
 
 type UserRepository interface {
 	GetByLogin(ctx context.Context, login string) (*model.User, error)
+	GetByID(ctx context.Context, id int64) (*model.User, error)
 	Register(ctx context.Context, login, pass, ip string) (*model.User, error)
 	CreateSession(ctx context.Context, uid int64, ip string) (string, error)
-	IsValidSession(ctx context.Context, token string) (bool, error)
+	UserIDFromSession(ctx context.Context, token string) (int64, error)
 }
 
 type userRepo struct {
@@ -56,6 +57,25 @@ func (r *userRepo) GetByLogin(ctx context.Context, login string) (*model.User, e
 	}
 	_ = r.users.Set(ctx, login, &dbUser)
 	return &dbUser, nil
+}
+
+func (r *userRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
+	var u model.User
+	var lastIP sql.NullString
+	err := r.db.DB.QueryRowContext(ctx,
+		"SELECT id, login, pass, created_at, updated_at, last_login_ip FROM users WHERE id=$1",
+		id,
+	).Scan(&u.ID, &u.Login, &u.Pass, &u.CreatedAt, &u.UpdatedAt, &lastIP)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if lastIP.Valid {
+		u.LastIp = lastIP.String
+	}
+	return &u, nil
 }
 
 func (r *userRepo) Register(ctx context.Context, login, pass, ip string) (*model.User, error) {
@@ -105,15 +125,15 @@ func (r *userRepo) CreateSession(ctx context.Context, uid int64, ip string) (str
 	return token, nil
 }
 
-func (r *userRepo) IsValidSession(ctx context.Context, token string) (bool, error) {
+func (r *userRepo) UserIDFromSession(ctx context.Context, token string) (int64, error) {
 	hash := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(hash[:])
 	cache, err := r.sessions.Get(ctx, tokenHash)
 	if err == nil {
 		if !cache.ExpiresAt.After(time.Now()) {
-			return false, nil
+			return 0, nil
 		}
-		return true, nil
+		return cache.UserID, nil
 	}
 	var dbSession model.Sessions
 	var ipNull sql.NullString
@@ -122,14 +142,14 @@ func (r *userRepo) IsValidSession(ctx context.Context, token string) (bool, erro
 		tokenHash).Scan(&dbSession.UserID, &dbSession.ExpiresAt, &ipNull, &dbSession.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil
+			return 0, nil
 		}
-		return false, err
+		return 0, err
 	}
 	if ipNull.Valid {
 		dbSession.IP = ipNull.String
 	}
 	dbSession.TokenHash = tokenHash
 	_ = r.sessions.Set(ctx, tokenHash, &dbSession)
-	return true, nil
+	return dbSession.UserID, nil
 }

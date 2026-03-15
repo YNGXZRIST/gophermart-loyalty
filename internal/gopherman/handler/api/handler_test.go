@@ -16,15 +16,23 @@ import (
 var _ repository.UserRepository = (*mockUserRepo)(nil)
 
 type mockUserRepo struct {
-	getByLogin     func(ctx context.Context, login string) (*model.User, error)
-	register       func(ctx context.Context, login, pass, ip string) (*model.User, error)
-	createSession  func(ctx context.Context, uid int64, ip string) (string, error)
-	isValidSession func(ctx context.Context, token string) (bool, error)
+	getByLogin        func(ctx context.Context, login string) (*model.User, error)
+	getByID           func(ctx context.Context, id int64) (*model.User, error)
+	register          func(ctx context.Context, login, pass, ip string) (*model.User, error)
+	createSession     func(ctx context.Context, uid int64, ip string) (string, error)
+	userIDFromSession func(ctx context.Context, token string) (int64, error)
 }
 
 func (m *mockUserRepo) GetByLogin(ctx context.Context, login string) (*model.User, error) {
 	if m.getByLogin != nil {
 		return m.getByLogin(ctx, login)
+	}
+	return nil, nil
+}
+
+func (m *mockUserRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
+	if m.getByID != nil {
+		return m.getByID(ctx, id)
 	}
 	return nil, nil
 }
@@ -43,11 +51,11 @@ func (m *mockUserRepo) CreateSession(ctx context.Context, uid int64, ip string) 
 	return "", nil
 }
 
-func (m *mockUserRepo) IsValidSession(ctx context.Context, token string) (bool, error) {
-	if m.isValidSession != nil {
-		return m.isValidSession(ctx, token)
+func (m *mockUserRepo) UserIDFromSession(ctx context.Context, token string) (int64, error) {
+	if m.userIDFromSession != nil {
+		return m.userIDFromSession(ctx, token)
 	}
-	return false, nil
+	return 0, nil
 }
 
 func TestHandler_Register(t *testing.T) {
