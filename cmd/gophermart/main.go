@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"gophermart-loyalty/internal/gopherman/accrual"
 	"gophermart-loyalty/internal/gopherman/config/db"
 	"gophermart-loyalty/internal/gopherman/config/server"
 	"gophermart-loyalty/internal/gopherman/constant"
@@ -39,6 +41,9 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("error creating database connection: %w", err)
 	}
+	ctx := context.Background()
+	accrualClient := accrual.NewClient(ctx, newConn, cfg)
+	go accrualClient.StartPoolAccrual(ctx)
 	userRepo := repository.NewUserRepository(newConn)
 	newHandler := api.NewHandler(userRepo, lgr)
 	if err := http.ListenAndServe(cfg.Address, router.GetRouter(newHandler)); err != nil {
