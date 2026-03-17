@@ -2,16 +2,9 @@ package httpcompressor
 
 import (
 	"compress/gzip"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"io"
 	"net/http"
-)
-
-const (
-	ContentEncodingHeader = "Content-Encoding"
-	AcceptEncodingHeader  = "Accept-Encoding"
-	GzipEncoding          = "gzip"
-	ContentTypeHeader     = "Content-Type"
-	ApplicationJSON       = "application/json"
 )
 
 func NewGzipReader(r io.ReadCloser) (*CompressReader, error) {
@@ -24,5 +17,5 @@ func NewGzipReader(r io.ReadCloser) (*CompressReader, error) {
 
 func NewGzipWriter(w http.ResponseWriter) *CompressWriter {
 	gw := gzip.NewWriter(w)
-	return newCompressWriter(w, gw, GzipEncoding)
+	return newCompressWriter(w, gw, constant.GzipEncoding)
 }

@@ -21,6 +21,7 @@ type UserRepository interface {
 	CreateSession(ctx context.Context, uid int64, ip string) (string, error)
 	UserIDFromSession(ctx context.Context, token string) (int64, error)
 	IncrementWithdrawn(ctx context.Context, tx *conn.Tx, w *model.Withdrawal) error
+	IncrementBalance(ctx context.Context, tx *conn.Tx, userID int64, increment float64) error
 }
 
 type userRepo struct {
@@ -182,4 +183,28 @@ func (r *userRepo) IncrementWithdrawn(ctx context.Context, tx *conn.Tx, w *model
 	}
 
 	return nil
+}
+func (r *userRepo) IncrementBalance(ctx context.Context, tx *conn.Tx, userID int64, increment float64) error {
+	if increment == 0 {
+		return nil
+	}
+	u, err := r.GetByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("get user by id: %w", err)
+	}
+	fmt.Println(u.ID)
+	u.Balance += increment
+	fmt.Println(u.Balance)
+	_, err = tx.ExecContext(ctx,
+		"UPDATE users SET balance = $1 WHERE id = $2;",
+		u.Balance, u.ID)
+	if err != nil {
+		return fmt.Errorf("update user db error: %w", err)
+	}
+	err = r.usersByID.Set(ctx, u.ID, u)
+	if err != nil {
+		return fmt.Errorf("update user memory error: %w", err)
+	}
+	return nil
+
 }

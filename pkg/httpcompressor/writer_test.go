@@ -2,6 +2,7 @@ package httpcompressor
 
 import (
 	"compress/gzip"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -53,7 +54,7 @@ func TestCompressWriter_Write(t *testing.T) {
 			if n != len(tt.data) {
 				t.Errorf("Write() wrote %d bytes, want %d", n, len(tt.data))
 			}
-			if got := recorder.Header().Get(ContentEncodingHeader); got != tt.encoding {
+			if got := recorder.Header().Get(constant.ContentEncodingHeader); got != tt.encoding {
 				t.Errorf("Content-Encoding = %v, want %v", got, tt.encoding)
 			}
 			if err := cw.Close(); err != nil {
@@ -117,7 +118,7 @@ func TestCompressWriter_WriteHeader(t *testing.T) {
 			if got := recorder.Code; got != tt.statusCode {
 				t.Errorf("Status code = %v, want %v", got, tt.statusCode)
 			}
-			if got := recorder.Header().Get(ContentEncodingHeader); got != tt.encoding {
+			if got := recorder.Header().Get(constant.ContentEncodingHeader); got != tt.encoding {
 				t.Errorf("Content-Encoding = %v, want %v", got, tt.encoding)
 			}
 		})

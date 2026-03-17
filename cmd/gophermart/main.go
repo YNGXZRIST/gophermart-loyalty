@@ -16,6 +16,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -41,15 +43,20 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("error creating database connection: %w", err)
 	}
-	ctx := context.Background()
-	accrualClient := accrual.NewClient(ctx, newConn, cfg)
-	go accrualClient.StartPoolAccrual(ctx)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	repos := repository.Repositories{
 		User:       repository.NewUserRepository(newConn),
 		Order:      repository.NewOrderRepository(newConn),
 		Withdrawal: repository.NewWithdrawalRepository(newConn),
 	}
 	newHandler := api.NewHandler(newConn, repos, lgr)
+	if cfg.AccrualUseMock {
+		_ = accrual.NewMocker(cfg)
+	}
+	accrualClient := accrual.NewClient(ctx, newConn, repos, cfg)
+	go accrualClient.StartPoolAccrual(ctx)
+	go accrualClient.CollectResults(ctx)
 	if err := http.ListenAndServe(cfg.Address, router.GetRouter(newHandler)); err != nil {
 		return fmt.Errorf("error starting HTTP server: %w", err)
 	}

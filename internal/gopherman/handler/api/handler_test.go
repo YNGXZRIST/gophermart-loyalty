@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"gophermart-loyalty/internal/gopherman/auth/password"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/model"
 	"gophermart-loyalty/internal/gopherman/repository"
@@ -23,6 +24,10 @@ type mockUserRepo struct {
 	register          func(ctx context.Context, login, pass, ip string) (*model.User, error)
 	createSession     func(ctx context.Context, uid int64, ip string) (string, error)
 	userIDFromSession func(ctx context.Context, token string) (int64, error)
+}
+
+func (m *mockUserRepo) IncrementBalance(_ context.Context, _ *conn.Tx, _ int64, _ float64) error {
+	return nil
 }
 
 func (m *mockUserRepo) GetByLogin(ctx context.Context, login string) (*model.User, error) {
@@ -78,28 +83,28 @@ func TestHandler_Register(t *testing.T) {
 		{
 			name:        "invalid JSON returns 400",
 			body:        `{`,
-			contentType: "application/json",
+			contentType: constant.ApplicationJSON,
 			mock:        &mockUserRepo{},
 			wantStatus:  http.StatusBadRequest,
 		},
 		{
 			name:        "invalid body validation - short login",
 			body:        `{"login":"ab","password":"password123"}`,
-			contentType: "application/json",
+			contentType: constant.ApplicationJSON,
 			mock:        &mockUserRepo{},
 			wantStatus:  http.StatusBadRequest,
 		},
 		{
 			name:        "invalid body validation - short password",
 			body:        `{"login":"user123","password":"1234"}`,
-			contentType: "application/json",
+			contentType: constant.ApplicationJSON,
 			mock:        &mockUserRepo{},
 			wantStatus:  http.StatusBadRequest,
 		},
 		{
 			name:        "user already exists returns 409",
 			body:        `{"login":"existing","password":"password123"}`,
-			contentType: "application/json",
+			contentType: constant.ApplicationJSON,
 			mock: &mockUserRepo{
 				getByLogin: func(ctx context.Context, login string) (*model.User, error) {
 					return &model.User{ID: 1, Login: login}, nil
@@ -110,7 +115,7 @@ func TestHandler_Register(t *testing.T) {
 		{
 			name:        "GetByLogin error returns 500",
 			body:        `{"login":"user123","password":"password123"}`,
-			contentType: "application/json",
+			contentType: constant.ApplicationJSON,
 			mock: &mockUserRepo{
 				getByLogin: func(ctx context.Context, login string) (*model.User, error) {
 					return nil, context.DeadlineExceeded
@@ -135,7 +140,7 @@ func TestHandler_Register(t *testing.T) {
 		{
 			name:        "CreateSession error returns 500",
 			body:        `{"login":"user123","password":"password123"}`,
-			contentType: "application/json",
+			contentType: constant.ApplicationJSON,
 			mock: &mockUserRepo{
 				getByLogin: func(ctx context.Context, login string) (*model.User, error) {
 					return nil, nil

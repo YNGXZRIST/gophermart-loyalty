@@ -1,6 +1,7 @@
 package api
 
 import (
+	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/contextkey"
 	"gophermart-loyalty/internal/gopherman/service"
 	"io"
@@ -27,7 +28,7 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(constant.ContentTypeHeader, constant.ApplicationJSON)
 	w.WriteHeader(res.Code)
 	w.Write(data)
 }

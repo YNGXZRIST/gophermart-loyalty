@@ -1,6 +1,7 @@
 package httpcompressor
 
 import (
+	"gophermart-loyalty/internal/gopherman/constant"
 	"io"
 	"net/http"
 )
@@ -31,7 +32,7 @@ func (c *CompressWriter) Header() http.Header {
 
 func (c *CompressWriter) Write(p []byte) (int, error) {
 	if !c.wroteHeader {
-		c.w.Header().Set(ContentEncodingHeader, c.encoding)
+		c.w.Header().Set(constant.ContentEncodingHeader, c.encoding)
 		c.wroteHeader = true
 	}
 	return c.compressor.Write(p)
@@ -39,7 +40,7 @@ func (c *CompressWriter) Write(p []byte) (int, error) {
 
 func (c *CompressWriter) WriteHeader(statusCode int) {
 	if !c.wroteHeader {
-		c.w.Header().Set(ContentEncodingHeader, c.encoding)
+		c.w.Header().Set(constant.ContentEncodingHeader, c.encoding)
 		c.wroteHeader = true
 		c.w.WriteHeader(statusCode)
 	}

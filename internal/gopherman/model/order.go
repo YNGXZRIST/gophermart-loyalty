@@ -3,6 +3,7 @@ package model
 import "time"
 
 type Order struct {
+	ID        int64     `json:"-"`
 	UserID    int64     `json:"-"`
 	OrderID   string    `json:"order"`
 	Status    string    `json:"status"`

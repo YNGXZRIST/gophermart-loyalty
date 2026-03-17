@@ -4,6 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"gophermart-loyalty/internal/gopherman/constant"
+	"log"
+	"net"
+	"strconv"
 
 	"github.com/caarlos0/env/v11"
 )
@@ -14,6 +17,7 @@ type Options struct {
 	AccrualAddress     string `env:"ACCRUAL_SYSTEM_ADDRESS"`
 	Mode               string `env:"MODE"`
 	AccrualWorkerCount int    `env:"ACCRUAL_WORKER_COUNT"`
+	AccrualUseMock     bool   `env:"ACCRUAL_USE_MOCK"`
 }
 
 func NewOptions(args []string) (*Options, error) {
@@ -23,6 +27,16 @@ func NewOptions(args []string) (*Options, error) {
 	}
 	if err := opt.parseEnv(); err != nil {
 		return nil, fmt.Errorf("ERROR: cannot parse environment variables: %w", err)
+	}
+	if opt.AccrualUseMock {
+		ln, err := net.Listen("tcp", ":0")
+		if err != nil {
+			log.Fatal(err)
+		}
+		port := ln.Addr().(*net.TCPAddr).Port
+		ln.Close()
+		opt.AccrualAddress = "http://localhost:" + strconv.Itoa(port)
+		fmt.Printf("accrual address: %s\n", opt.AccrualAddress)
 	}
 	return opt, nil
 }
@@ -47,6 +61,7 @@ func (opt *Options) parseArgs(args []string) error {
 	flags.StringVar(&opt.AccrualAddress, "r", opt.AccrualAddress, "Address of accrual server")
 	flags.StringVar(&opt.Mode, "m", constant.TypeModeDefault, "Server mode")
 	flags.IntVar(&opt.AccrualWorkerCount, "ac", constant.AccrualWorkerCountDefault, "Worker accrual count")
+	flags.BoolVar(&opt.AccrualUseMock, "accrual-mock", false, "Use free port for accrual address (start mock server on this port)")
 	err := flags.Parse(args)
 	if err != nil {
 		return err

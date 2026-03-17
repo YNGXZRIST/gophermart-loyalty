@@ -3,7 +3,7 @@ package middleware
 import (
 	"bytes"
 	"compress/gzip"
-	"gophermart-loyalty/pkg/httpcompressor"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -33,18 +33,18 @@ func TestGzipCompressor(t *testing.T) {
 		},
 		{
 			name:               "Accept-Encoding gzip compresses response",
-			acceptEncoding:     httpcompressor.GzipEncoding,
+			acceptEncoding:     constant.GzipEncoding,
 			contentEncoding:    "",
 			reqBody:            nil,
 			wantStatus:         http.StatusOK,
 			wantNextCalled:     true,
-			wantRespEncoding:   httpcompressor.GzipEncoding,
+			wantRespEncoding:   constant.GzipEncoding,
 			wantRespBodyDecode: true,
 		},
 		{
 			name:               "Content-Encoding gzip decompresses request body",
 			acceptEncoding:     "",
-			contentEncoding:    httpcompressor.GzipEncoding,
+			contentEncoding:    constant.GzipEncoding,
 			reqBody:            gzipEncode([]byte("hello")),
 			wantStatus:         http.StatusOK,
 			wantNextCalled:     true,
@@ -69,10 +69,10 @@ func TestGzipCompressor(t *testing.T) {
 			handler := GzipCompressor(next)
 			req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(tt.reqBody))
 			if tt.acceptEncoding != "" {
-				req.Header.Set(httpcompressor.AcceptEncodingHeader, tt.acceptEncoding)
+				req.Header.Set(constant.AcceptEncodingHeader, tt.acceptEncoding)
 			}
 			if tt.contentEncoding != "" {
-				req.Header.Set(httpcompressor.ContentEncodingHeader, tt.contentEncoding)
+				req.Header.Set(constant.ContentEncodingHeader, tt.contentEncoding)
 			}
 			rec := httptest.NewRecorder()
 
@@ -85,7 +85,7 @@ func TestGzipCompressor(t *testing.T) {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
 			}
 			if tt.wantRespEncoding != "" {
-				if got := rec.Header().Get(httpcompressor.ContentEncodingHeader); got != tt.wantRespEncoding {
+				if got := rec.Header().Get(constant.ContentEncodingHeader); got != tt.wantRespEncoding {
 					t.Errorf("Content-Encoding = %q, want %q", got, tt.wantRespEncoding)
 				}
 			}
@@ -103,7 +103,7 @@ func TestGzipCompressor(t *testing.T) {
 					t.Errorf("decoded body = %q, want %q", decoded, "ok")
 				}
 			}
-			if tt.contentEncoding == httpcompressor.GzipEncoding && len(nextBody) > 0 && string(nextBody) != "hello" {
+			if tt.contentEncoding == constant.GzipEncoding && len(nextBody) > 0 && string(nextBody) != "hello" {
 				t.Errorf("next received body = %q, want %q", nextBody, "hello")
 			}
 		})
@@ -117,7 +117,7 @@ func TestGzipMiddleware_invalidGzipBodyReturns500(t *testing.T) {
 
 	handler := GzipCompressor(next)
 	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte("not gzip")))
-	req.Header.Set(httpcompressor.ContentEncodingHeader, httpcompressor.GzipEncoding)
+	req.Header.Set(constant.ContentEncodingHeader, constant.GzipEncoding)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

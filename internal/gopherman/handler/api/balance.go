@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/contextkey"
 	"gophermart-loyalty/internal/gopherman/service"
 	"net/http"
@@ -26,7 +27,7 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(res.Code)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(constant.ContentTypeHeader, constant.ApplicationJSON)
 	bytes, err := json.Marshal(res.Balance)
 	if err != nil {
 		h.lgr.Info("marshal balance error", zap.String("error", res.Err.Error()))

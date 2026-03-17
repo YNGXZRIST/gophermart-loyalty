@@ -1,6 +1,7 @@
 package api
 
 import (
+	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/contextkey"
 	"gophermart-loyalty/internal/gopherman/service"
 	"net/http"
@@ -20,7 +21,7 @@ func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(res.Code)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(constant.ContentTypeHeader, constant.ApplicationJSON)
 	w.WriteHeader(http.StatusOK)
 	bytes, err := service.WithdrawalsJSON(res.Withdrawals)
 	if err != nil {
