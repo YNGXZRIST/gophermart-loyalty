@@ -2,7 +2,9 @@ package repository
 
 import (
 	"context"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/conn"
+	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/model"
 )
 
@@ -24,16 +26,16 @@ func (r *WithdrawalRepo) Add(ctx context.Context, tx *conn.Tx, w *model.Withdraw
 		`INSERT INTO withdrawals (user_id, order_id, sum) VALUES ($1, $2, $3)`,
 		w.UserID, w.OrderID, w.Sum)
 	if err != nil {
-		return err
+		return labelerrors.NewLabelError(constant.LabelRepository+".Withdrawal.Add.Exec", err)
 	}
-	return err
+	return nil
 }
 func (r *WithdrawalRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Withdrawal, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT order_id, sum, created_at, updated_at FROM withdrawals WHERE user_id = $1 ORDER BY created_at DESC`,
 		userID)
 	if err != nil {
-		return nil, err
+		return nil, labelerrors.NewLabelError(constant.LabelRepository+".Withdrawal.GetByUserID.Query", err)
 	}
 	defer rows.Close()
 
@@ -43,10 +45,13 @@ func (r *WithdrawalRepo) GetByUserID(ctx context.Context, userID int64) ([]*mode
 		w.UserID = userID
 		err = rows.Scan(&w.OrderID, &w.Sum, &w.CreatedAt, &w.UpdatedAt)
 		if err != nil {
-			return nil, err
+			return nil, labelerrors.NewLabelError(constant.LabelRepository+".Withdrawal.GetByUserID.Scan", err)
 		}
 		wth := w
 		list = append(list, &wth)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, labelerrors.NewLabelError(constant.LabelRepository+".Withdrawal.GetByUserID.Rows", err)
+	}
+	return list, nil
 }

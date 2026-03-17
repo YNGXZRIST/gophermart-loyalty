@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/conn"
+	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/model"
 
 	"github.com/jackc/pgerrcode"
@@ -34,30 +35,32 @@ func NewOrderRepository(db *conn.DB) OrderRepository {
 func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("cannot start a transaction: %w", err)
+		return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.BeginTx", err)
 	}
 	defer tx.Rollback()
 	var ownerID sql.NullInt64
 	err = r.db.QueryRowContext(ctx, `SELECT user_id FROM orders WHERE order_id = $1`, orderID).Scan(&ownerID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		fmt.Println("error checking order:", err)
-		return err
+		return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.CheckOwner", err)
 	}
 	if ownerID.Valid {
 		if ownerID.Int64 == userID {
-			return ErrOrderExistsOwn
+			return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.ExistsOwn", ErrOrderExistsOwn)
 		}
-		return ErrOrderExistsOther
+		return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.ExistsOther", ErrOrderExistsOther)
 	}
 	_, err = r.db.ExecContext(ctx,
 		`INSERT INTO orders (user_id, order_id, status) VALUES ($1, $2, 'NEW')`,
 		userID, orderID)
 	if err != nil {
 		if pgErr, ok := errors.AsType[*pgconn.PgError](err); !ok || pgErr.Code != pgerrcode.UniqueViolation {
-			return err
+			return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.Insert", err)
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.Commit", err)
+	}
+	return nil
 }
 
 func (r *orderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Order, error) {
@@ -69,7 +72,7 @@ func (r *orderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Ord
 		if errors.Is(err, sql.ErrNoRows) {
 			return []*model.Order{}, nil
 		}
-		return nil, err
+		return nil, labelerrors.NewLabelError(constant.LabelRepository+".Order.GetByUserID.Query", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -78,14 +81,17 @@ func (r *orderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Ord
 		o.UserID = userID
 		err = rows.Scan(&o.ID, &o.OrderID, &o.Status, &accrual, &o.CreatedAt, &o.UpdatedAt)
 		if err != nil {
-			return nil, err
+			return nil, labelerrors.NewLabelError(constant.LabelRepository+".Order.GetByUserID.Scan", err)
 		}
 		if accrual.Valid {
 			o.Accrual = new(accrual.Float64)
 		}
 		list = append(list, new(o))
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, labelerrors.NewLabelError(constant.LabelRepository+".Order.GetByUserID.Rows", err)
+	}
+	return list, nil
 }
 
 func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order, error) {
@@ -100,7 +106,7 @@ func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 			if errors.Is(err, sql.ErrNoRows) {
 				return list, nil
 			}
-			return nil, err
+			return nil, labelerrors.NewLabelError(constant.LabelRepository+".Order.GetOrdersPendingAccrual.Query", err)
 		}
 		var chunkCount int
 		for rows.Next() {
@@ -109,7 +115,7 @@ func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 			err = rows.Scan(&o.ID, &o.OrderID, &o.UserID, &o.Status, &o.CreatedAt, &o.UpdatedAt)
 			if err != nil {
 				_ = rows.Close()
-				return nil, err
+				return nil, labelerrors.NewLabelError(constant.LabelRepository+".Order.GetOrdersPendingAccrual.Scan", err)
 			}
 			if accrual.Valid {
 				o.Accrual = new(accrual.Float64)
@@ -119,7 +125,7 @@ func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 			chunkCount++
 		}
 		if err = rows.Err(); err != nil {
-			return nil, err
+			return nil, labelerrors.NewLabelError(constant.LabelRepository+".Order.GetOrdersPendingAccrual.Rows", err)
 		}
 		_ = rows.Close()
 		if chunkCount < chunkSize {
@@ -132,7 +138,7 @@ func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 func (r *orderRepo) UpdateOrderAccrual(ctx context.Context, tx *conn.Tx, order *model.Order) error {
 	_, err := tx.ExecContext(ctx, "UPDATE orders SET status = $1,accrual = $2 WHERE id = $3;", order.Status, order.Accrual, order.ID)
 	if err != nil {
-		return fmt.Errorf("update order accrual error: %w", err)
+		return labelerrors.NewLabelError(constant.LabelRepository+".Order.UpdateOrderAccrual.Exec", err)
 	}
 	return nil
 }

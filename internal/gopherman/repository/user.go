@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"gophermart-loyalty/internal/gopherman/auth/password"
 	"gophermart-loyalty/internal/gopherman/auth/session"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/conn"
+	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/model"
 	"gophermart-loyalty/pkg/storage"
 	"time"
@@ -49,7 +51,7 @@ func (r *userRepo) GetByLogin(ctx context.Context, login string) (*model.User, e
 		login,
 	).Scan(&dbUser.ID, &dbUser.Login, &dbUser.Pass, &dbUser.CreatedAt, &dbUser.UpdatedAt, &lastIP, &dbUser.Balance, &dbUser.Withdrawn)
 	if err != nil {
-		return nil, err
+		return nil, labelerrors.NewLabelError(constant.LabelRepository+".User.GetByLogin.Query", err)
 	}
 	if lastIP.Valid {
 		dbUser.LastIP = lastIP.String
@@ -71,7 +73,7 @@ func (r *userRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
 		id,
 	).Scan(&dbUser.ID, &dbUser.Login, &dbUser.Pass, &dbUser.CreatedAt, &dbUser.UpdatedAt, &lastIP, &dbUser.Balance, &dbUser.Withdrawn)
 	if err != nil {
-		return nil, err
+		return nil, labelerrors.NewLabelError(constant.LabelRepository+".User.GetByID.Query", err)
 	}
 	if lastIP.Valid {
 		dbUser.LastIP = lastIP.String
@@ -84,7 +86,7 @@ func (r *userRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
 func (r *userRepo) Register(ctx context.Context, login, pass, ip string) (*model.User, error) {
 	hash, err := password.Hash(pass)
 	if err != nil {
-		return nil, fmt.Errorf("could not hash password: %w", err)
+		return nil, labelerrors.NewLabelError(constant.LabelRepository+".User.Register.HashPassword", err)
 	}
 	var u model.User
 	var lastIP sql.NullString
@@ -93,7 +95,7 @@ func (r *userRepo) Register(ctx context.Context, login, pass, ip string) (*model
 		login, hash, ip,
 	).Scan(&u.ID, &u.Login, &u.Pass, &u.CreatedAt, &u.UpdatedAt, &lastIP)
 	if err != nil {
-		return nil, fmt.Errorf("could not insert user: %w", err)
+		return nil, labelerrors.NewLabelError(constant.LabelRepository+".User.Register.Insert", err)
 	}
 	if lastIP.Valid {
 		u.LastIP = lastIP.String
@@ -105,11 +107,11 @@ func (r *userRepo) Register(ctx context.Context, login, pass, ip string) (*model
 func (r *userRepo) UpdateLastIP(ctx context.Context, userID int64, ip string) error {
 	u, err := r.GetByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("could not update last ip: %w", err)
+		return labelerrors.NewLabelError(constant.LabelRepository+".User.UpdateLastIP.GetByID", err)
 	}
 	_, err = r.db.ExecContext(ctx, "UPDATE users SET last_login_ip=$1 where id=$2", ip, userID)
 	if err != nil {
-		return fmt.Errorf("could not update last ip: %w", err)
+		return labelerrors.NewLabelError(constant.LabelRepository+".User.UpdateLastIP.Exec", err)
 	}
 	u.LastIP = ip
 	return nil
@@ -117,7 +119,7 @@ func (r *userRepo) UpdateLastIP(ctx context.Context, userID int64, ip string) er
 func (r *userRepo) CreateSession(ctx context.Context, userID int64, ip string) (string, error) {
 	token, err := session.GenerateToken()
 	if err != nil {
-		return "", fmt.Errorf("generate token: %w", err)
+		return "", labelerrors.NewLabelError(constant.LabelRepository+".User.CreateSession.GenerateToken", err)
 	}
 	hash := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(hash[:])
@@ -133,7 +135,7 @@ func (r *userRepo) CreateSession(ctx context.Context, userID int64, ip string) (
 		   expires_at = EXCLUDED.expires_at`,
 		tokenHash, userID, expiresAt, ip)
 	if err != nil {
-		return "", fmt.Errorf("upsert session: %w", err)
+		return "", labelerrors.NewLabelError(constant.LabelRepository+".User.CreateSession.Upsert", err)
 	}
 	_ = r.sessions.Set(ctx, tokenHash, &model.Sessions{UserID: userID, TokenHash: tokenHash, ExpiresAt: expiresAt, IP: ip})
 	return token, nil
@@ -155,7 +157,7 @@ func (r *userRepo) UserIDFromSession(ctx context.Context, token string) (int64, 
 		"SELECT user_id, expires_at, ip, created_at FROM sessions WHERE token_hash = $1 AND expires_at > CURRENT_TIMESTAMP",
 		tokenHash).Scan(&dbSession.UserID, &dbSession.ExpiresAt, &ipNull, &dbSession.CreatedAt)
 	if err != nil {
-		return 0, err
+		return 0, labelerrors.NewLabelError(constant.LabelRepository+".User.UserIDFromSession.Query", err)
 	}
 	if ipNull.Valid {
 		dbSession.IP = ipNull.String
@@ -175,11 +177,11 @@ func (r *userRepo) IncrementWithdrawn(ctx context.Context, tx *conn.Tx, w *model
 		`UPDATE users SET balance = $1,withdrawn = $2  WHERE id = $3`,
 		u.Balance, u.Withdrawn, u.ID)
 	if err != nil {
-		return fmt.Errorf("update user db error: %w", err)
+		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementWithdrawn.Exec", err)
 	}
 	err = r.usersByID.Set(ctx, u.ID, u)
 	if err != nil {
-		return fmt.Errorf("update user memory error: %w", err)
+		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementWithdrawn.Cache", err)
 	}
 
 	return nil
@@ -190,7 +192,7 @@ func (r *userRepo) IncrementBalance(ctx context.Context, tx *conn.Tx, userID int
 	}
 	u, err := r.GetByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("get user by id: %w", err)
+		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementBalance.GetByID", err)
 	}
 	fmt.Println(u.ID)
 	u.Balance += increment
@@ -199,11 +201,11 @@ func (r *userRepo) IncrementBalance(ctx context.Context, tx *conn.Tx, userID int
 		"UPDATE users SET balance = $1 WHERE id = $2;",
 		u.Balance, u.ID)
 	if err != nil {
-		return fmt.Errorf("update user db error: %w", err)
+		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementBalance.Exec", err)
 	}
 	err = r.usersByID.Set(ctx, u.ID, u)
 	if err != nil {
-		return fmt.Errorf("update user memory error: %w", err)
+		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementBalance.Cache", err)
 	}
 	return nil
 

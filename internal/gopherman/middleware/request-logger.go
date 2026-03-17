@@ -13,6 +13,7 @@ type (
 	responseData struct {
 		status int
 		size   int
+		Body   string
 	}
 	loggingResponseWriter struct {
 		http.ResponseWriter // встраиваем оригинальный http.ResponseWriter
@@ -23,6 +24,7 @@ type (
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	size, err := r.ResponseWriter.Write(b)
 	r.responseData.size += size
+	r.responseData.Body = string(b)
 	return size, err
 }
 
@@ -54,6 +56,7 @@ func WithRequestLogger(logger *zap.Logger) func(http.Handler) http.Handler {
 			responseData := &responseData{
 				status: 0,
 				size:   0,
+				Body:   "",
 			}
 			lw := loggingResponseWriter{
 				ResponseWriter: w,
@@ -67,6 +70,7 @@ func WithRequestLogger(logger *zap.Logger) func(http.Handler) http.Handler {
 				"status", responseData.status,
 				"duration", duration,
 				"size", responseData.size,
+				"body", responseData.Body,
 			)
 
 		})

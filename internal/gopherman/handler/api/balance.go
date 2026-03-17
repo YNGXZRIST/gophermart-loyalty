@@ -24,7 +24,7 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 	res := h.ser.GetBalance(r.Context(), service.BalanceInput{UserID: userID})
 	if res.Err != nil {
-		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".GetBalance", res.Err)
+		lerr := labelerrors.NewLabelError(constant.LabelAPIHandler+".GetBalance", res.Err)
 		h.Lgr.Info("get balance error", zap.String("error", lerr.Error()))
 		w.WriteHeader(res.Code)
 		return
@@ -32,7 +32,7 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(constant.ContentTypeHeader, constant.ApplicationJSON)
 	bytes, err := json.Marshal(res.Balance)
 	if err != nil {
-		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".GetBalance.Marshal", err)
+		lerr := labelerrors.NewLabelError(constant.LabelAPIHandler+".GetBalance.Marshal", err)
 		h.Lgr.Info("marshal balance error", zap.String("error", lerr.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -58,7 +58,7 @@ func (h *Handler) MakeWithdraw(w http.ResponseWriter, r *http.Request) {
 		Amount:  req.Amount,
 	})
 	if res.Err != nil {
-		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".MakeWithdraw", res.Err)
+		lerr := labelerrors.NewLabelError(constant.LabelAPIHandler+".MakeWithdraw", res.Err)
 		h.Lgr.Info("add withdrawal error", zap.String("error", lerr.Error()))
 	}
 	w.WriteHeader(res.Code)

@@ -1,15 +1,16 @@
 package constant
 
 const (
-	ServerType   = "server"
-	AccrualType  = "accrual"
-	LabelServer  = "SERVER"
-	LabelMain    = "MAIN"
-	LabelFlags   = "FLAGS"
-	LabelAccrual = "ACCRUAL"
+	ServerType      = "server"
+	AccrualType     = "accrual"
+	LabelServer     = "SERVER"
+	LabelMain       = "MAIN"
+	LabelFlags      = "FLAGS"
+	LabelAccrual    = "ACCRUAL"
+	LabelRepository = "REPOSITORY"
 )
 const (
 	LabelHandler    = "HANDLER"
-	LabelApi        = "API"
-	LabelApiHandler = LabelHandler + "." + LabelApi
+	LabelAPI        = "API"
+	LabelAPIHandler = LabelHandler + "." + LabelAPI
 )
