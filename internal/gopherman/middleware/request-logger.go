@@ -2,8 +2,10 @@ package middleware
 
 import (
 	"bytes"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -58,6 +60,8 @@ func WithRequestLogger(logger *zap.Logger) func(http.Handler) http.Handler {
 				size:   0,
 				Body:   "",
 			}
+			acceptEncoding := r.Header.Get(constant.AcceptEncodingHeader)
+			supportsGzip := strings.Contains(acceptEncoding, constant.GzipEncoding)
 			lw := loggingResponseWriter{
 				ResponseWriter: w,
 				responseData:   responseData,
@@ -70,6 +74,7 @@ func WithRequestLogger(logger *zap.Logger) func(http.Handler) http.Handler {
 				"status", responseData.status,
 				"duration", duration,
 				"size", responseData.size,
+				"supportsGzip", supportsGzip,
 				"body", responseData.Body,
 			)
 
