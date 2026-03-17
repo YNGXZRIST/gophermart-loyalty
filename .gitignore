@@ -24,3 +24,4 @@ vendor/
 /bin/statictest
 /internal/gopherman/logger/logs/server_errors.log
 /internal/gopherman/logger/logs/server_info.log
+/logs/

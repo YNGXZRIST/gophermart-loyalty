@@ -9,6 +9,7 @@ import (
 	"gophermart-loyalty/internal/gopherman/model"
 
 	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -36,8 +37,7 @@ func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error
 		`INSERT INTO orders (user_id, order_id, status) VALUES ($1, $2, 'NEW')`,
 		userID, orderID)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if !errors.As(err, &pgErr) || pgErr.Code != pgerrcode.UniqueViolation {
+		if pgErr, ok := errors.AsType[*pgconn.PgError](err); !ok || pgErr.Code != pgerrcode.UniqueViolation {
 			return err
 		}
 	}
@@ -53,15 +53,17 @@ func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error
 }
 
 func (r *orderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Order, error) {
+	var list []*model.Order
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, order_id, status, accrual, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC`,
 		userID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return []*model.Order{}, nil
+		}
 		return nil, err
 	}
 	defer rows.Close()
-
-	var list []*model.Order
 	for rows.Next() {
 		var o model.Order
 		var accrual sql.NullFloat64
@@ -71,11 +73,9 @@ func (r *orderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Ord
 			return nil, err
 		}
 		if accrual.Valid {
-			v := accrual.Float64
-			o.Accrual = &v
+			o.Accrual = new(accrual.Float64)
 		}
-		ord := o
-		list = append(list, &ord)
+		list = append(list, new(o))
 	}
 	return list, rows.Err()
 }
@@ -89,6 +89,9 @@ func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 			`SELECT id, order_id, user_id, status, created_at, updated_at FROM orders WHERE status IN ('NEW', 'PROCESSING') AND id > $1 ORDER BY id ASC LIMIT $2`,
 			lastID, chunkSize)
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return list, nil
+			}
 			return nil, err
 		}
 		var chunkCount int
@@ -101,8 +104,7 @@ func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 				return nil, err
 			}
 			if accrual.Valid {
-				v := accrual.Float64
-				o.Accrual = &v
+				o.Accrual = new(accrual.Float64)
 			}
 			list = append(list, &o)
 			lastID = o.ID

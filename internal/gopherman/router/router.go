@@ -13,6 +13,7 @@ func GetRouter(handler *api.Handler) *chi.Mux {
 	r.Group(func(r chi.Router) {
 		r.Use(mChi.RequestID)
 		r.Use(mChi.StripSlashes)
+		r.Use(middleware.WithRequestLogger(handler.Lgr))
 		r.Route("/api", func(rApi chi.Router) {
 			rApi.Route("/user", func(rU chi.Router) {
 				rU.Group(func(rJson chi.Router) {

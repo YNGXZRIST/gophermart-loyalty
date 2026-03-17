@@ -12,14 +12,14 @@ import (
 
 type Handler struct {
 	ser *service.Service
-	lgr *zap.Logger
+	Lgr *zap.Logger
 }
 
 func NewHandler(conn *conn.DB, repos r.Repositories, lgr *zap.Logger) *Handler {
 	newService := service.NewService(conn, repos)
 	return &Handler{
 		ser: newService,
-		lgr: lgr,
+		Lgr: lgr,
 	}
 }
 

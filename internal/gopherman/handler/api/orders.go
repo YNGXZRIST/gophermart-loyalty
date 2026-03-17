@@ -20,14 +20,14 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	res := h.ser.GetOrders(r.Context(), service.GetOrdersInput{UserID: userID})
 	if res.Err != nil {
 		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".GetOrders", res.Err)
-		h.lgr.Info("get orders error", zap.String("error", lerr.Error()))
+		h.Lgr.Info("get orders error", zap.String("error", lerr.Error()))
 		w.WriteHeader(res.Code)
 		return
 	}
 	data, err := service.OrdersJSON(res.Orders)
 	if err != nil {
 		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".GetOrders.Marshal", err)
-		h.lgr.Info("marshal error", zap.String("error", lerr.Error()))
+		h.Lgr.Info("marshal error", zap.String("error", lerr.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -53,7 +53,7 @@ func (h *Handler) AddOrder(w http.ResponseWriter, r *http.Request) {
 	})
 	if res.Err != nil {
 		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".AddOrder", res.Err)
-		h.lgr.Info("add order error", zap.String("error", lerr.Error()))
+		h.Lgr.Info("add order error", zap.String("error", lerr.Error()))
 	}
 	w.WriteHeader(res.Code)
 }

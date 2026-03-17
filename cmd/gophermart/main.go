@@ -38,6 +38,7 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println(cfg)
 
 	lgr, err := initLogger(cfg)
 	if err != nil {

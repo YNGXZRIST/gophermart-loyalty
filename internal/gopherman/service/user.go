@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"gophermart-loyalty/internal/gopherman/auth/password"
 	"gophermart-loyalty/internal/gopherman/model"
@@ -28,7 +30,7 @@ type LoginResponse struct {
 
 func (s *Service) Register(ctx context.Context, in RegisterInput) RegisterOutput {
 	user, err := s.Rep.User.GetByLogin(ctx, in.Req.Login)
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return RegisterOutput{
 			Response: Response{
 				Code: http.StatusInternalServerError,
