@@ -1,10 +1,19 @@
-# Исключить пакеты из тестов (например, integration): COVER_EXCLUDE='integration|/cmd/'
 COVER_EXCLUDE ?=
-# Список пакетов для тестов: все ./... или без COVER_EXCLUDE
 TEST_PKGS := $(shell go list ./...)
 ifneq ($(COVER_EXCLUDE),)
 TEST_PKGS := $(shell go list ./... | grep -vE '$(COVER_EXCLUDE)')
 endif
+
+docker-up: ## Запустить docker-compose (БД + сервер), контейнеры с restart policy
+	@echo "$(GREEN)Starting containers with docker-compose...$(NC)"
+	docker compose up -d --build
+
+docker-down: ## Остановить и удалить контейнеры docker-compose
+	@echo "$(YELLOW)Stopping containers...$(NC)"
+	docker compose down
+
+docker-logs: ## Смотреть логи приложения
+	docker compose logs -f app
 
 test: ## Запустить тесты (без integration)
 	@echo "$(GREEN)Running tests...$(NC)"
