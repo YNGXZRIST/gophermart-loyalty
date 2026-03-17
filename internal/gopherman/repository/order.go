@@ -9,7 +9,6 @@ import (
 	"gophermart-loyalty/internal/gopherman/model"
 
 	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -33,7 +32,24 @@ func NewOrderRepository(db *conn.DB) OrderRepository {
 }
 
 func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error {
-	_, err := r.db.ExecContext(ctx,
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("cannot start a transaction: %w", err)
+	}
+	defer tx.Rollback()
+	var ownerID sql.NullInt64
+	err = r.db.QueryRowContext(ctx, `SELECT user_id FROM orders WHERE order_id = $1`, orderID).Scan(&ownerID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		fmt.Println("error checking order:", err)
+		return err
+	}
+	if ownerID.Valid {
+		if ownerID.Int64 == userID {
+			return ErrOrderExistsOwn
+		}
+		return ErrOrderExistsOther
+	}
+	_, err = r.db.ExecContext(ctx,
 		`INSERT INTO orders (user_id, order_id, status) VALUES ($1, $2, 'NEW')`,
 		userID, orderID)
 	if err != nil {
@@ -41,15 +57,7 @@ func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error
 			return err
 		}
 	}
-	var ownerID int64
-	err = r.db.QueryRowContext(ctx, `SELECT user_id FROM orders WHERE order_id = $1`, orderID).Scan(&ownerID)
-	if err != nil {
-		return err
-	}
-	if ownerID == userID {
-		return ErrOrderExistsOwn
-	}
-	return ErrOrderExistsOther
+	return tx.Commit()
 }
 
 func (r *orderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Order, error) {
@@ -58,7 +66,7 @@ func (r *orderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Ord
 		`SELECT id, order_id, status, accrual, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC`,
 		userID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return []*model.Order{}, nil
 		}
 		return nil, err
@@ -89,7 +97,7 @@ func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 			`SELECT id, order_id, user_id, status, created_at, updated_at FROM orders WHERE status IN ('NEW', 'PROCESSING') AND id > $1 ORDER BY id ASC LIMIT $2`,
 			lastID, chunkSize)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, sql.ErrNoRows) {
 				return list, nil
 			}
 			return nil, err

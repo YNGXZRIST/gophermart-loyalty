@@ -1,10 +1,11 @@
 package middleware
 
 import (
-	"net/http"
-
+	"database/sql"
+	"errors"
 	"gophermart-loyalty/internal/gopherman/contextkey"
 	"gophermart-loyalty/internal/gopherman/handler/api"
+	"net/http"
 )
 
 func Authenticate(handler *api.Handler) func(next http.Handler) http.Handler {
@@ -16,7 +17,7 @@ func Authenticate(handler *api.Handler) func(next http.Handler) http.Handler {
 				return
 			}
 			userID, err := handler.UserIDFromRequest(r.Context(), raw)
-			if err != nil {
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
