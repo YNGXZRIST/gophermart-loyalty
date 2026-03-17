@@ -3,6 +3,7 @@ package api
 import (
 	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/contextkey"
+	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/service"
 	"net/http"
 
@@ -17,7 +18,8 @@ func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	}
 	res := h.ser.GetWithdrawals(r.Context(), service.GetWithdrawalsInput{UserID: userID})
 	if res.Err != nil {
-		h.lgr.Info("get orders error", zap.String("error", res.Err.Error()))
+		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".GetWithdrawals", res.Err)
+		h.lgr.Info("get orders error", zap.String("error", lerr.Error()))
 		w.WriteHeader(res.Code)
 		return
 	}
@@ -25,7 +27,8 @@ func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	bytes, err := service.WithdrawalsJSON(res.Withdrawals)
 	if err != nil {
-		h.lgr.Info("get orders error", zap.String("error", res.Err.Error()))
+		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".GetWithdrawals.Marshal", err)
+		h.lgr.Info("get orders error", zap.String("error", lerr.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

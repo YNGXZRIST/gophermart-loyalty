@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"gophermart-loyalty/internal/gopherman/config/db"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/pgerrors"
+	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -24,12 +26,12 @@ type DB struct {
 
 func NewConn(cfg *db.Config) (*DB, error) {
 	if cfg == nil || cfg.DNS == "" {
-		return nil, fmt.Errorf("database DSN is not set")
+		return nil, labelerrors.NewLabelError(constant.PGXLabel+".NewConn.DSN", fmt.Errorf("database DSN is not set"))
 	}
 	dsn := cfg.DNS
 	conn, err := sql.Open("pgx", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("error connecting to database: %w", err)
+		return nil, labelerrors.NewLabelError(constant.PGXLabel+".NewConn.Open", fmt.Errorf("error connecting to database: %w", err))
 	}
 	return &DB{DB: conn, Config: cfg}, nil
 }
@@ -46,7 +48,7 @@ func runWithRetry[T any](ctx context.Context, op func() (T, error)) (T, error) {
 			return lastRes, nil
 		}
 		if classifier.Classify(lastErr) == pgerrors.NonRetriable {
-			return zero, pgerrors.NewPgError(lastErr)
+			return zero, labelerrors.NewLabelError(constant.PGXLabel+".RunWithRetry.NonRetriable", pgerrors.NewPgError(lastErr))
 		}
 		select {
 		case <-ctx.Done():
@@ -56,7 +58,7 @@ func runWithRetry[T any](ctx context.Context, op func() (T, error)) (T, error) {
 		}
 	}
 	if lastErr != nil {
-		lastErr = pgerrors.NewPgError(lastErr)
+		lastErr = labelerrors.NewLabelError(constant.PGXLabel+".RunWithRetry.Retried", pgerrors.NewPgError(lastErr))
 	}
 	return lastRes, lastErr
 }

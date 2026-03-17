@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/contextkey"
+	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/service"
 	"net/http"
 
@@ -23,14 +24,16 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	}
 	res := h.ser.GetBalance(r.Context(), service.BalanceInput{UserID: userID})
 	if res.Err != nil {
-		h.lgr.Info("get balance error", zap.String("error", res.Err.Error()))
+		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".GetBalance", res.Err)
+		h.lgr.Info("get balance error", zap.String("error", lerr.Error()))
 		w.WriteHeader(res.Code)
 		return
 	}
 	w.Header().Set(constant.ContentTypeHeader, constant.ApplicationJSON)
 	bytes, err := json.Marshal(res.Balance)
 	if err != nil {
-		h.lgr.Info("marshal balance error", zap.String("error", res.Err.Error()))
+		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".GetBalance.Marshal", err)
+		h.lgr.Info("marshal balance error", zap.String("error", lerr.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -55,7 +58,8 @@ func (h *Handler) MakeWithdraw(w http.ResponseWriter, r *http.Request) {
 		Amount:  req.Amount,
 	})
 	if res.Err != nil {
-		h.lgr.Info("add withdrawal error", zap.String("error", res.Err.Error()))
+		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".MakeWithdraw", res.Err)
+		h.lgr.Info("add withdrawal error", zap.String("error", lerr.Error()))
 	}
 	w.WriteHeader(res.Code)
 }

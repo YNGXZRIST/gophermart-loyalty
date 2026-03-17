@@ -7,6 +7,8 @@ import (
 	"gophermart-loyalty/internal/gopherman/config/server"
 	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/conn"
+	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
+	"gophermart-loyalty/internal/gopherman/logger"
 	"gophermart-loyalty/internal/gopherman/model"
 	"gophermart-loyalty/internal/gopherman/repository"
 	"gophermart-loyalty/internal/gopherman/service"
@@ -16,6 +18,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type Client struct {
@@ -27,6 +31,7 @@ type Client struct {
 	mu         sync.Mutex
 	accrualURL string
 	RetryAfter time.Time
+	logger     *zap.Logger
 }
 type TaskResult struct {
 	Order           *model.Order
@@ -44,19 +49,24 @@ type accrualResult struct {
 	RetryAfter string
 }
 
-func NewClient(ctx context.Context, db *conn.DB, repos repository.Repositories, cfg *server.Config) *Client {
+func NewClient(ctx context.Context, db *conn.DB, repos repository.Repositories, cfg *server.Config) (*Client, error) {
 	newService := service.NewService(db, repos)
 	reportPool := workerpool.NewPool(cfg.AccrualWorkerCount)
 	httpClient := &http.Client{}
 	reportPool.StartBg(ctx)
+	lgr, err := logger.Initialize(cfg.Mode, constant.AccrualType)
+	if err != nil {
+		return nil, labelerrors.NewLabelError(constant.LabelAccrual+".NewClient.Logger", err)
+	}
 	return &Client{
 		db:         db,
 		ser:        newService,
 		Pool:       reportPool,
 		httpClient: httpClient,
 		accrualURL: cfg.AccrualAddress,
+		logger:     lgr,
 		inFlight:   make(map[string]*model.Order, 1000),
-	}
+	}, nil
 }
 
 func (c *Client) StartPoolAccrual(ctx context.Context) {
@@ -71,7 +81,7 @@ func (c *Client) StartPoolAccrual(ctx context.Context) {
 			c.mu.Unlock()
 			list, err := c.ser.Rep.Order.GetOrdersPendingAccrual(ctx)
 			if err != nil {
-				fmt.Println("Error getting orders", err)
+				c.logger.Error("Error getting orders", zap.Error(labelerrors.NewLabelError(constant.LabelAccrual+".Client.PendingOrders", err)))
 			}
 			for _, o := range list {
 				c.mu.Lock()
@@ -111,12 +121,12 @@ func (c *Client) CollectResults(ctx context.Context) {
 			return
 		case res := <-resultCh:
 			if res.Err != nil {
-				fmt.Println("error", res.Err)
+				c.logger.Error("collect result income error", zap.Error(labelerrors.NewLabelError(constant.LabelAccrual+".Client.Task", res.Err)))
 				continue
 			}
 			err := c.updateOrder(ctx, res)
 			if err != nil {
-				fmt.Println("error updating order", err)
+				c.logger.Error("error updating order", zap.Error(labelerrors.NewLabelError(constant.LabelAccrual+".Client.UpdateOrder", err)))
 			}
 		}
 	}
@@ -126,7 +136,7 @@ func (c *Client) sendRequestToAccrual(ctx context.Context, order *model.Order) (
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.SendRequest.Context", ctx.Err())
 		default:
 		}
 		c.mu.Lock()
@@ -137,7 +147,7 @@ func (c *Client) sendRequestToAccrual(ctx context.Context, order *model.Order) (
 			select {
 			case <-ctx.Done():
 				timer.Stop()
-				return nil, ctx.Err()
+				return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.SendRequest.Context", ctx.Err())
 			case <-timer.C:
 			}
 		}
@@ -152,13 +162,13 @@ func (c *Client) sendRequestToAccrual(ctx context.Context, order *model.Order) (
 			sec := c.setRetryTimeout(result.RetryAfter)
 			err := waitOrCancel(ctx, time.Duration(sec)*time.Second)
 			if err != nil {
-				return nil, err
+				return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.SendRequest.WaitRetryAfter", err)
 			}
 			continue
 		default:
 			err := waitOrCancel(ctx, 2*time.Second)
 			if err != nil {
-				return nil, err
+				return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.SendRequest.WaitDefault", err)
 			}
 			continue
 		}
@@ -169,16 +179,16 @@ func (c *Client) sendRequestToAccrual(ctx context.Context, order *model.Order) (
 func (c *Client) doAccrualRequest(ctx context.Context, url string) (*accrualResult, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.doAccrualRequest.NewRequest", err)
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.doAccrualRequest.Do", err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.doAccrualRequest.ReadBody", err)
 	}
 	return &accrualResult{
 		StatusCode: resp.StatusCode,
@@ -190,7 +200,7 @@ func (c *Client) doAccrualRequest(ctx context.Context, url string) (*accrualResu
 func (c *Client) handleSuccessResponse(body []byte, order *model.Order) (*TaskResult, error) {
 	var accResp Response
 	if err := json.Unmarshal(body, &accResp); err != nil {
-		return nil, err
+		return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.handleSuccess.Unmarshal", err)
 	}
 	c.mu.Lock()
 	delete(c.inFlight, order.OrderID)
@@ -233,18 +243,22 @@ func (c *Client) updateOrder(ctx context.Context, taskRes workerpool.Task) error
 	order.Accrual = accrualResponse.Accrual
 	tx, err := c.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("cannot begin transaction %w", err)
+		return labelerrors.NewLabelError(constant.LabelAccrual+".Client.updateOrder.BeginTx", fmt.Errorf("cannot begin transaction %w", err))
 	}
 	defer tx.Rollback()
 	err = c.ser.Rep.Order.UpdateOrderAccrual(ctx, tx, order)
 	if err != nil {
-		return fmt.Errorf("cannot update order accrual %w", err)
+		return labelerrors.NewLabelError(constant.LabelAccrual+".Client.updateOrder.UpdateAccrual", fmt.Errorf("cannot update order accrual %w", err))
+
 	}
 	if order.Accrual != nil {
 		err = c.ser.Rep.User.IncrementBalance(ctx, tx, order.UserID, *order.Accrual)
 		if err != nil {
-			return fmt.Errorf("cannot increment balance for user %w", err)
+			return labelerrors.NewLabelError(constant.LabelAccrual+".Client.updateOrder.IncrementBalance", fmt.Errorf("cannot increment balance for user %w", err))
 		}
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return labelerrors.NewLabelError(constant.LabelAccrual+".Client.updateOrder.Commit", err)
+	}
+	return nil
 }

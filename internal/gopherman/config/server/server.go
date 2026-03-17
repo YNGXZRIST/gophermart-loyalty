@@ -3,6 +3,8 @@ package server
 import (
 	"fmt"
 	"gophermart-loyalty/internal/gopherman/config/server/internal"
+	"gophermart-loyalty/internal/gopherman/constant"
+	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 )
 
 type Config struct {
@@ -16,7 +18,7 @@ func NewConfig(args []string) (*Config, error) {
 	}
 	err = opt.ValidateOptions()
 	if err != nil {
-		return nil, fmt.Errorf("error validating options: %w", err)
+		return nil, labelerrors.NewLabelError(constant.LabelFlags, fmt.Errorf("error validating options: %w", err))
 	}
 	cfg := &Config{
 		*opt,

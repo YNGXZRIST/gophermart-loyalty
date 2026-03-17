@@ -9,6 +9,7 @@ import (
 	"gophermart-loyalty/internal/gopherman/config/server"
 	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/conn"
+	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/handler/api"
 	"gophermart-loyalty/internal/gopherman/logger"
 	"gophermart-loyalty/internal/gopherman/repository"
@@ -26,7 +27,7 @@ import (
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		log.Fatal(fmt.Errorf("failed initialization server: %w", err))
+		log.Fatal(labelerrors.NewLabelError(constant.LabelMain+".Run", fmt.Errorf("failed initialization server: %w", err)))
 	}
 }
 func run(args []string) error {
@@ -55,7 +56,10 @@ func run(args []string) error {
 	repos := initRepos(dbConn)
 	handler := initHTTPHandler(dbConn, repos, lgr)
 
-	startAccrual(ctx, cfg, dbConn, repos)
+	err = startAccrual(ctx, cfg, dbConn, repos)
+	if err != nil {
+		return err
+	}
 
 	return startHTTPServer(ctx, cfg, handler)
 }
@@ -63,7 +67,7 @@ func run(args []string) error {
 func initConfig(args []string) (*server.Config, error) {
 	cfg, err := server.NewConfig(args)
 	if err != nil {
-		return nil, fmt.Errorf("error creating config: %w", err)
+		return nil, labelerrors.NewLabelError(constant.LabelMain+".InitConfig", fmt.Errorf("error creating config: %w", err))
 	}
 	return cfg, nil
 }
@@ -71,13 +75,13 @@ func initConfig(args []string) (*server.Config, error) {
 func initLogger(cfg *server.Config) (*zap.Logger, error) {
 	lgr, err := logger.Initialize(cfg.Mode, constant.ServerType)
 	if err != nil {
-		return nil, fmt.Errorf("error initializing logger: %w", err)
+		return nil, labelerrors.NewLabelError(constant.LabelMain+".InitLogger", fmt.Errorf("error initializing logger: %w", err))
 	}
 	return lgr, nil
 }
 func runMigrations(cfg *server.Config) error {
 	if err := migrations.Migrate(cfg.DatabaseURL); err != nil {
-		return fmt.Errorf("error migrating database: %w", err)
+		return labelerrors.NewLabelError(constant.LabelMain+".RunMigrations", fmt.Errorf("error migrating database: %w", err))
 	}
 	return nil
 }
@@ -92,7 +96,7 @@ func initDB(cfg *server.Config) (*conn.DB, error) {
 	dbConfig := db.NewCfg(cfg.DatabaseURL)
 	newConn, err := conn.NewConn(dbConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error creating database connection: %w", err)
+		return nil, labelerrors.NewLabelError(constant.LabelMain+".InitDB", fmt.Errorf("error creating database connection: %w", err))
 	}
 	return newConn, nil
 }
@@ -101,14 +105,18 @@ func initHTTPHandler(dbConn *conn.DB, repos repository.Repositories, lgr *zap.Lo
 	return api.NewHandler(dbConn, repos, lgr)
 }
 
-func startAccrual(ctx context.Context, cfg *server.Config, dbConn *conn.DB, repos repository.Repositories) {
+func startAccrual(ctx context.Context, cfg *server.Config, dbConn *conn.DB, repos repository.Repositories) error {
 	if cfg.AccrualUseMock {
 		_ = accrual.NewMocker(cfg)
 	}
 
-	accrualClient := accrual.NewClient(ctx, dbConn, repos, cfg)
+	accrualClient, err := accrual.NewClient(ctx, dbConn, repos, cfg)
+	if err != nil {
+		return labelerrors.NewLabelError(constant.LabelMain+".StartAccrual", fmt.Errorf("cannot start accrual worker client: %w", err))
+	}
 	go accrualClient.StartPoolAccrual(ctx)
 	go accrualClient.CollectResults(ctx)
+	return nil
 }
 
 func startHTTPServer(ctx context.Context, cfg *server.Config, handler *api.Handler) error {
@@ -129,10 +137,10 @@ func startHTTPServer(ctx context.Context, cfg *server.Config, handler *api.Handl
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			return fmt.Errorf("server shutdown failed: %w", err)
+			return labelerrors.NewLabelError(constant.LabelMain+".HTTPServer.Shutdown", fmt.Errorf("server shutdown failed: %w", err))
 		}
 		return nil
 	case err := <-errCh:
-		return fmt.Errorf("error starting HTTP server: %w", err)
+		return labelerrors.NewLabelError(constant.LabelMain+".HTTPServer.Listen", fmt.Errorf("error starting HTTP server: %w", err))
 	}
 }

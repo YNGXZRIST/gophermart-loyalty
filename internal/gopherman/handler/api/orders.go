@@ -3,6 +3,7 @@ package api
 import (
 	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/contextkey"
+	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/service"
 	"io"
 	"net/http"
@@ -18,13 +19,15 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	}
 	res := h.ser.GetOrders(r.Context(), service.GetOrdersInput{UserID: userID})
 	if res.Err != nil {
-		h.lgr.Info("get orders error", zap.String("error", res.Err.Error()))
+		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".GetOrders", res.Err)
+		h.lgr.Info("get orders error", zap.String("error", lerr.Error()))
 		w.WriteHeader(res.Code)
 		return
 	}
 	data, err := service.OrdersJSON(res.Orders)
 	if err != nil {
-		h.lgr.Info("marshal error", zap.String("error", res.Err.Error()))
+		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".GetOrders.Marshal", err)
+		h.lgr.Info("marshal error", zap.String("error", lerr.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -49,7 +52,8 @@ func (h *Handler) AddOrder(w http.ResponseWriter, r *http.Request) {
 		OrderID: string(body),
 	})
 	if res.Err != nil {
-		h.lgr.Info("add order error", zap.String("error", res.Err.Error()))
+		lerr := labelerrors.NewLabelError(constant.LabelApiHandler+".AddOrder", res.Err)
+		h.lgr.Info("add order error", zap.String("error", lerr.Error()))
 	}
 	w.WriteHeader(res.Code)
 }
