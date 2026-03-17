@@ -20,7 +20,6 @@ func GzipCompressor(next http.Handler) http.Handler {
 		}
 		contentEncoding := r.Header.Get(constant.ContentEncodingHeader)
 		sendsGzip := strings.Contains(contentEncoding, constant.GzipEncoding)
-		sendsGzip = false
 		if sendsGzip {
 			cr, err := httpcompressor.NewGzipReader(r.Body)
 			if err != nil {
