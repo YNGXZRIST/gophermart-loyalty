@@ -14,7 +14,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-type Mocker struct {
+type MockServer struct {
 	Server    *http.Server
 	Addr      string
 	mu        sync.Mutex
@@ -27,7 +27,7 @@ var AvailableTypes = map[int]string{
 	2: constant.Processed,
 }
 
-func NewMocker(cfg *server.Config) *Mocker {
+func NewMockServer(cfg *server.Config) *MockServer {
 	u, err := url.Parse(cfg.AccrualAddress)
 	if err != nil {
 		panic("accrual mocker: invalid AccrualAddress: " + err.Error())
@@ -35,7 +35,7 @@ func NewMocker(cfg *server.Config) *Mocker {
 	addr := u.Host
 	r := chi.NewRouter()
 	srv := &http.Server{Addr: addr, Handler: r}
-	m := &Mocker{Server: srv, Addr: addr, ordersMap: make(map[string]bool)}
+	m := &MockServer{Server: srv, Addr: addr, ordersMap: make(map[string]bool)}
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.RequestLimit(rate.NewLimiter(1, 3), 60))
 		r.Get("/api/orders/{orderID}", m.handleMockOrder)
@@ -45,7 +45,7 @@ func NewMocker(cfg *server.Config) *Mocker {
 	}()
 	return m
 }
-func (c *Mocker) handleMockOrder(w http.ResponseWriter, r *http.Request) {
+func (c *MockServer) handleMockOrder(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return

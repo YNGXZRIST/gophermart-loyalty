@@ -108,7 +108,7 @@ func initHTTPHandler(dbConn *conn.DB, repos repository.Repositories, lgr *zap.Lo
 
 func startAccrual(ctx context.Context, cfg *server.Config, dbConn *conn.DB, repos repository.Repositories) error {
 	if cfg.AccrualUseMock {
-		_ = accrual.NewMocker(cfg)
+		_ = accrual.NewMockServer(cfg)
 	}
 
 	accrualClient, err := accrual.NewClient(ctx, dbConn, repos, cfg)

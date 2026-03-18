@@ -26,8 +26,7 @@ func NewPgError(err error) error {
 	if err == nil {
 		return nil
 	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		return &PgErrors{Code: pgErr.Code, Message: pgErr.Message, Err: err}
 	}
 	return &PgErrors{Message: err.Error(), Err: err}
