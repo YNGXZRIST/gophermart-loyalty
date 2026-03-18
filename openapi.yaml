@@ -1,0 +1,300 @@
+openapi: 3.0.3
+info:
+  title: Gophermart Loyalty API
+  version: 1.0.0
+  description: HTTP API для сервиса накопительной системы лояльности.
+servers:
+  - url: http://{host}:{port}
+    variables:
+      host:
+        default: localhost
+      port:
+        default: "8080"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: "token"
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - login
+        - password
+      properties:
+        login:
+          type: string
+          minLength: 3
+          maxLength: 255
+          description: Логин пользователя.
+        password:
+          type: string
+          minLength: 5
+          description: Пароль пользователя.
+    BalanceResponse:
+      type: object
+      required:
+        - current
+        - withdrawn
+      properties:
+        current:
+          type: number
+          format: double
+          description: Текущий баланс.
+        withdrawn:
+          type: number
+          format: double
+          description: Списано за всё время регистрации.
+    Order:
+      type: object
+      required:
+        - number
+        - status
+        - uploaded_at
+      properties:
+        number:
+          type: string
+          description: Номер заказа.
+        status:
+          type: string
+          description: Статус обработки начисления.
+        accrual:
+          type: number
+          format: double
+          nullable: true
+          description: Начисленные баллы (может отсутствовать при отсутствии начисления).
+        uploaded_at:
+          type: string
+          format: date-time
+          description: Время загрузки/создания заказа (RFC3339).
+    WithdrawalRequest:
+      type: object
+      required:
+        - order
+        - sum
+      properties:
+        order:
+          type: string
+          description: Номер заказа.
+        sum:
+          type: number
+          format: double
+          description: Сумма баллов к списанию.
+    Withdrawal:
+      type: object
+      required:
+        - order
+        - sum
+        - processed_at
+      properties:
+        order:
+          type: string
+          description: Номер заказа.
+        sum:
+          type: number
+          format: double
+          description: Сумма списания.
+        processed_at:
+          type: string
+          format: date-time
+          description: Время обработки вывода/списания (RFC3339).
+paths:
+  /api/user/register:
+    post:
+      tags:
+        - Auth
+      operationId: register
+      summary: Регистрация пользователя
+      description: |
+        Требуется `Content-Type: application/json`.
+        При успехе сервер возвращает HTTP `200` и заголовок `Authorization: Bearer <token>`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "200":
+          description: Пользователь успешно зарегистрирован и аутентифицирован (response body отсутствует).
+          headers:
+            Authorization:
+              schema:
+                type: string
+              description: Bearer-токен для авторизованных запросов.
+        "400":
+          description: Некорректный JSON/валидация запроса.
+        "409":
+          description: Логин уже занят.
+        "415":
+          description: Неверный `Content-Type` (ожидается `application/json`).
+        "500":
+          description: Внутренняя ошибка сервера.
+
+  /api/user/login:
+    post:
+      tags:
+        - Auth
+      operationId: login
+      summary: Аутентификация пользователя
+      description: |
+        Требуется `Content-Type: application/json`.
+        При успехе сервер возвращает HTTP `200` и заголовок `Authorization: Bearer <token>`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "200":
+          description: Пользователь успешно аутентифицирован (response body отсутствует).
+          headers:
+            Authorization:
+              schema:
+                type: string
+              description: Bearer-токен для авторизованных запросов.
+        "400":
+          description: Некорректный JSON/валидация запроса.
+        "401":
+          description: Неверная пара логин/пароль.
+        "415":
+          description: Неверный `Content-Type` (ожидается `application/json`).
+        "500":
+          description: Внутренняя ошибка сервера.
+
+  /api/user/orders:
+    post:
+      tags:
+        - Orders
+      operationId: addOrder
+      summary: Загрузка номера заказа
+      description: |
+        Требуется авторизация.
+        Тело запроса содержит номер заказа как plain text (алгоритм Луна используется для валидации).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        description: Номер заказа в plain text (например, "12345678903").
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: Номер заказа уже загружен этим пользователем (body отсутствует).
+        "202":
+          description: Новый номер заказа принят в обработку (body отсутствует).
+        "400":
+          description: Некорректный формат (например, пустая строка после trim).
+        "401":
+          description: Пользователь не авторизован.
+        "409":
+          description: Номер заказа уже загружен другим пользователем.
+        "422":
+          description: Неверный номер заказа (не проходит валидацию).
+        "500":
+          description: Внутренняя ошибка сервера.
+    get:
+      tags:
+        - Orders
+      operationId: getOrders
+      summary: Получение списка загруженных заказов
+      description: |
+        Требуется авторизация.
+        Ответ всегда возвращает JSON-массив (может быть пустым).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Список заказов.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+        "401":
+          description: Пользователь не авторизован.
+        "500":
+          description: Внутренняя ошибка сервера.
+
+  /api/user/balance:
+    get:
+      tags:
+        - Balance
+      operationId: getBalance
+      summary: Получение текущего баланса
+      description: Требуется авторизация. Возвращает JSON-объект с `current` и `withdrawn`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Текущий баланс.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceResponse"
+        "401":
+          description: Пользователь не авторизован.
+        "500":
+          description: Внутренняя ошибка сервера.
+
+  /api/user/balance/withdraw:
+    post:
+      tags:
+        - Balance
+      operationId: makeWithdraw
+      summary: Списание баллов со счёта
+      description: |
+        Требуется авторизация.
+        Требуется `Content-Type: application/json`.
+        При успехе возвращается HTTP `200` (body отсутствует).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalRequest"
+      responses:
+        "200":
+          description: Успешное списание (body отсутствует).
+        "400":
+          description: Некорректный JSON/валидация запроса.
+        "401":
+          description: Пользователь не авторизован.
+        "402":
+          description: Недостаточно средств.
+        "415":
+          description: Неверный `Content-Type` (ожидается `application/json`).
+        "422":
+          description: Неверный номер заказа (не проходит валидацию).
+        "500":
+          description: Внутренняя ошибка сервера.
+
+  /api/user/withdrawals:
+    get:
+      tags:
+        - Withdrawals
+      operationId: getWithdrawals
+      summary: Получение информации о выводе средств
+      description: Требуется авторизация. Возвращает JSON-массив (может быть пустым).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Список списаний.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Withdrawal"
+        "401":
+          description: Пользователь не авторизован.
+        "500":
+          description: Внутренняя ошибка сервера.
