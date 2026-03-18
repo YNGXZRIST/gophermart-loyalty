@@ -33,6 +33,21 @@ type userRepo struct {
 	sessions  *storage.MemStorage[string, *model.Sessions]
 }
 
+const (
+	userGetByLoginQuery    = "SELECT id, login, pass, created_at, updated_at, last_login_ip, balance, withdrawn FROM users WHERE login=$1"
+	UserGetByIDQuery       = "SELECT id, login, pass, created_at, updated_at, last_login_ip, balance, withdrawn FROM users WHERE id=$1"
+	userRegisterQuery      = "INSERT INTO users(login, pass, last_login_ip) VALUES ($1, $2, $3) RETURNING id, login, pass, created_at, updated_at, last_login_ip"
+	userUpdateLastIPQuery  = "UPDATE users SET last_login_ip=$1 where id=$2"
+	userUpsertSessionQuery = `INSERT INTO sessions (token_hash, user_id, expires_at, ip) VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (user_id, ip) DO UPDATE SET
+		   token_hash = EXCLUDED.token_hash,
+		   expires_at = EXCLUDED.expires_at`
+	userUserIDFromSessionQuery = "SELECT user_id, expires_at, ip, created_at FROM sessions WHERE token_hash = $1 AND expires_at > CURRENT_TIMESTAMP"
+
+	userIncrementWithdrawnQuery = `UPDATE users SET balance = $1,withdrawn = $2  WHERE id = $3`
+	userIncrementBalanceQuery   = "UPDATE users SET balance = $1 WHERE id = $2;"
+)
+
 func NewUserRepository(db *conn.DB) UserRepository {
 	loginToID := storage.NewMemStorage[string, int64]()
 	usersByID := storage.NewMemStorage[int64, *model.User]()
@@ -47,7 +62,7 @@ func (r *userRepo) GetByLogin(ctx context.Context, login string) (*model.User, e
 	var dbUser model.User
 	var lastIP sql.NullString
 	err := r.db.DB.QueryRowContext(ctx,
-		"SELECT id, login, pass, created_at, updated_at, last_login_ip, balance, withdrawn FROM users WHERE login=$1",
+		userGetByLoginQuery,
 		login,
 	).Scan(&dbUser.ID, &dbUser.Login, &dbUser.Pass, &dbUser.CreatedAt, &dbUser.UpdatedAt, &lastIP, &dbUser.Balance, &dbUser.Withdrawn)
 	if err != nil {
@@ -69,7 +84,7 @@ func (r *userRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
 	var dbUser model.User
 	var lastIP sql.NullString
 	err = r.db.DB.QueryRowContext(ctx,
-		"SELECT id, login, pass, created_at, updated_at, last_login_ip, balance, withdrawn FROM users WHERE id=$1",
+		UserGetByIDQuery,
 		id,
 	).Scan(&dbUser.ID, &dbUser.Login, &dbUser.Pass, &dbUser.CreatedAt, &dbUser.UpdatedAt, &lastIP, &dbUser.Balance, &dbUser.Withdrawn)
 	if err != nil {
@@ -91,7 +106,7 @@ func (r *userRepo) Register(ctx context.Context, login, pass, ip string) (*model
 	var u model.User
 	var lastIP sql.NullString
 	err = r.db.QueryRowContext(ctx,
-		"INSERT INTO users(login, pass, last_login_ip) VALUES ($1, $2, $3) RETURNING id, login, pass, created_at, updated_at, last_login_ip",
+		userRegisterQuery,
 		login, hash, ip,
 	).Scan(&u.ID, &u.Login, &u.Pass, &u.CreatedAt, &u.UpdatedAt, &lastIP)
 	if err != nil {
@@ -109,7 +124,7 @@ func (r *userRepo) UpdateLastIP(ctx context.Context, userID int64, ip string) er
 	if err != nil {
 		return labelerrors.NewLabelError(constant.LabelRepository+".User.UpdateLastIP.GetByID", err)
 	}
-	_, err = r.db.ExecContext(ctx, "UPDATE users SET last_login_ip=$1 where id=$2", ip, userID)
+	_, err = r.db.ExecContext(ctx, userUpdateLastIPQuery, ip, userID)
 	if err != nil {
 		return labelerrors.NewLabelError(constant.LabelRepository+".User.UpdateLastIP.Exec", err)
 	}
@@ -129,10 +144,7 @@ func (r *userRepo) CreateSession(ctx context.Context, userID int64, ip string) (
 		return "", err
 	}
 	_, err = r.db.ExecContext(ctx,
-		`INSERT INTO sessions (token_hash, user_id, expires_at, ip) VALUES ($1, $2, $3, $4)
-		 ON CONFLICT (user_id, ip) DO UPDATE SET
-		   token_hash = EXCLUDED.token_hash,
-		   expires_at = EXCLUDED.expires_at`,
+		userUpsertSessionQuery,
 		tokenHash, userID, expiresAt, ip)
 	if err != nil {
 		return "", labelerrors.NewLabelError(constant.LabelRepository+".User.CreateSession.Upsert", err)
@@ -154,7 +166,7 @@ func (r *userRepo) UserIDFromSession(ctx context.Context, token string) (int64, 
 	var dbSession model.Sessions
 	var ipNull sql.NullString
 	err = r.db.DB.QueryRowContext(ctx,
-		"SELECT user_id, expires_at, ip, created_at FROM sessions WHERE token_hash = $1 AND expires_at > CURRENT_TIMESTAMP",
+		userUserIDFromSessionQuery,
 		tokenHash).Scan(&dbSession.UserID, &dbSession.ExpiresAt, &ipNull, &dbSession.CreatedAt)
 	if err != nil {
 		return 0, labelerrors.NewLabelError(constant.LabelRepository+".User.UserIDFromSession.Query", err)
@@ -174,7 +186,7 @@ func (r *userRepo) IncrementWithdrawn(ctx context.Context, tx *conn.Tx, w *model
 	u.Balance -= w.Sum
 	u.Withdrawn += w.Sum
 	_, err = tx.ExecContext(ctx,
-		`UPDATE users SET balance = $1,withdrawn = $2  WHERE id = $3`,
+		userIncrementWithdrawnQuery,
 		u.Balance, u.Withdrawn, u.ID)
 	if err != nil {
 		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementWithdrawn.Exec", err)
@@ -198,7 +210,7 @@ func (r *userRepo) IncrementBalance(ctx context.Context, tx *conn.Tx, userID int
 	u.Balance += increment
 	fmt.Println(u.Balance)
 	_, err = tx.ExecContext(ctx,
-		"UPDATE users SET balance = $1 WHERE id = $2;",
+		userIncrementBalanceQuery,
 		u.Balance, u.ID)
 	if err != nil {
 		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementBalance.Exec", err)

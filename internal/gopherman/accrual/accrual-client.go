@@ -22,6 +22,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const Path = "/api/orders/"
+
 type Client struct {
 	db         *conn.DB
 	ser        *service.Service
@@ -132,7 +134,7 @@ func (c *Client) CollectResults(ctx context.Context) {
 	}
 }
 func (c *Client) sendRequestToAccrual(ctx context.Context, order *model.Order) (*TaskResult, error) {
-	url := c.accrualURL + "/api/orders/" + order.OrderID
+	url := c.accrualURL + Path + order.OrderID
 	for {
 		select {
 		case <-ctx.Done():

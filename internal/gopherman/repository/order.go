@@ -13,6 +13,14 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+const (
+	OrderGetOwnerQuery                  = `SELECT user_id FROM orders WHERE order_id = $1`
+	OrderAddOrderQuery                  = `INSERT INTO orders (user_id, order_id, status) VALUES ($1, $2, 'NEW')`
+	OrderGetByUidQuery                  = `SELECT id, order_id, status, accrual, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC`
+	OrderGetPendingOrdersWithLimitQuery = `SELECT id, order_id, user_id, status, created_at, updated_at FROM orders WHERE status IN ('NEW', 'PROCESSING') AND id > $1 ORDER BY id ASC LIMIT $2`
+	OrderUpdatePendingOrderQuery        = "UPDATE orders SET status = $1,accrual = $2 WHERE id = $3;"
+)
+
 var ErrOrderExistsOwn = errors.New("order already exists for this user")
 
 var ErrOrderExistsOther = errors.New("order already exists for another user")
@@ -39,7 +47,7 @@ func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error
 	}
 	defer tx.Rollback()
 	var ownerID sql.NullInt64
-	err = r.db.QueryRowContext(ctx, `SELECT user_id FROM orders WHERE order_id = $1`, orderID).Scan(&ownerID)
+	err = r.db.QueryRowContext(ctx, OrderGetOwnerQuery, orderID).Scan(&ownerID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.CheckOwner", err)
 	}
@@ -50,7 +58,7 @@ func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error
 		return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.ExistsOther", ErrOrderExistsOther)
 	}
 	_, err = r.db.ExecContext(ctx,
-		`INSERT INTO orders (user_id, order_id, status) VALUES ($1, $2, 'NEW')`,
+		OrderAddOrderQuery,
 		userID, orderID)
 	if err != nil {
 		if pgErr, ok := errors.AsType[*pgconn.PgError](err); !ok || pgErr.Code != pgerrcode.UniqueViolation {
@@ -66,7 +74,7 @@ func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error
 func (r *orderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Order, error) {
 	var list []*model.Order
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, order_id, status, accrual, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC`,
+		OrderGetByUidQuery,
 		userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -100,7 +108,7 @@ func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 	var list []*model.Order
 	for {
 		rows, err := r.db.QueryContext(ctx,
-			`SELECT id, order_id, user_id, status, created_at, updated_at FROM orders WHERE status IN ('NEW', 'PROCESSING') AND id > $1 ORDER BY id ASC LIMIT $2`,
+			OrderGetPendingOrdersWithLimitQuery,
 			lastID, chunkSize)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -136,7 +144,7 @@ func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 }
 
 func (r *orderRepo) UpdateOrderAccrual(ctx context.Context, tx *conn.Tx, order *model.Order) error {
-	_, err := tx.ExecContext(ctx, "UPDATE orders SET status = $1,accrual = $2 WHERE id = $3;", order.Status, order.Accrual, order.ID)
+	_, err := tx.ExecContext(ctx, OrderUpdatePendingOrderQuery, order.Status, order.Accrual, order.ID)
 	if err != nil {
 		return labelerrors.NewLabelError(constant.LabelRepository+".Order.UpdateOrderAccrual.Exec", err)
 	}

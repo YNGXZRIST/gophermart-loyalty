@@ -1,6 +1,8 @@
 package contextkey
 
-import "context"
+import (
+	"context"
+)
 
 type key int
 

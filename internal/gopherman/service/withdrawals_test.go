@@ -16,15 +16,15 @@ import (
 
 func testMockConn(t *testing.T, setup func(sqlmock.Sqlmock)) *conn.DB {
 	t.Helper()
-	sqlDB, mock, err := sqlmock.New()
+	sqlDB, m, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if setup != nil {
-		setup(mock)
+		setup(m)
 	}
 	t.Cleanup(func() {
-		if err := mock.ExpectationsWereMet(); err != nil {
+		if err := m.ExpectationsWereMet(); err != nil {
 			t.Errorf("sqlmock: %v", err)
 		}
 		_ = sqlDB.Close()

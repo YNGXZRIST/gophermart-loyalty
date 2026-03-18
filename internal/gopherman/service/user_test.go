@@ -4,13 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"net/http"
-	"testing"
-
 	"gophermart-loyalty/internal/gopherman/auth/password"
 	"gophermart-loyalty/internal/gopherman/model"
 	"gophermart-loyalty/internal/gopherman/repository"
 	"gophermart-loyalty/internal/gopherman/repository/mock"
+	"net/http"
+	"testing"
 
 	"github.com/golang/mock/gomock"
 )
@@ -105,7 +104,7 @@ func TestService_Register(t *testing.T) {
 func TestService_Login(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	req := model.RegisterRequest{Login: "alice", Pass: "correcthorse"}
+	req := model.RegisterRequest{Login: "test", Pass: "correct"}
 	ip := "10.0.0.1"
 	hash, err := password.Hash(req.Pass)
 	if err != nil {

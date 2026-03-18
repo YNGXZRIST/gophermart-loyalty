@@ -5,9 +5,11 @@ type Config struct {
 	MaxRetries int
 }
 
+const MaxRetries int = 3
+
 func NewCfg(dns string) *Config {
 	return &Config{
 		DNS:        dns,
-		MaxRetries: 3,
+		MaxRetries: MaxRetries,
 	}
 }
