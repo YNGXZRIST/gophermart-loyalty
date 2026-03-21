@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"gophermart-loyalty/internal/gopherman/db/conn"
+	"gophermart-loyalty/internal/gopherman/db/trmanager"
 	"gophermart-loyalty/internal/gopherman/model"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ func Test_orderRepo_Add(t *testing.T) {
 	orderID := "order-1"
 
 	db, mock := newMockConnDB(t)
-	r := &orderRepo{db: db}
+	r := &orderRepo{repoBase: repoBase{db: db}}
 	mock.MatchExpectationsInOrder(false)
 
 	mock.ExpectBegin()
@@ -54,7 +55,7 @@ func Test_orderRepo_GetByUserID(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(10)
 	db, mock := newMockConnDB(t)
-	r := &orderRepo{db: db}
+	r := &orderRepo{repoBase: repoBase{db: db}}
 	mock.MatchExpectationsInOrder(false)
 
 	createdAt := time.Now().Add(-time.Hour)
@@ -92,7 +93,7 @@ func Test_orderRepo_GetOrdersPendingAccrual(t *testing.T) {
 	mock.MatchExpectationsInOrder(false)
 
 	sqlDB := &conn.DB{DB: db}
-	r := &orderRepo{db: sqlDB}
+	r := &orderRepo{repoBase: repoBase{db: sqlDB}}
 
 	createdAt := time.Now().Add(-time.Minute)
 	updatedAt := time.Now().Add(-time.Second)
@@ -134,7 +135,7 @@ func Test_orderRepo_UpdateOrderAccrual(t *testing.T) {
 	defer db.Close()
 
 	sqlDB := &conn.DB{DB: db}
-	r := &orderRepo{db: sqlDB}
+	r := &orderRepo{repoBase: repoBase{db: sqlDB}}
 
 	var accrual = 12.34
 	order := &model.Order{ID: 1, Status: "PROCESSING", Accrual: &accrual}
@@ -150,7 +151,8 @@ func Test_orderRepo_UpdateOrderAccrual(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectRollback()
 
-	if err := r.UpdateOrderAccrual(ctx, &conn.Tx{Tx: txSQL}, order); err != nil {
+	txCtx := trmanager.WithTx(ctx, &conn.Tx{Tx: txSQL})
+	if err := r.UpdateOrderAccrual(txCtx, order); err != nil {
 		t.Fatalf("UpdateOrderAccrual() error = %v, want nil", err)
 	}
 

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"gophermart-loyalty/internal/gopherman/db/conn"
+	"gophermart-loyalty/internal/gopherman/db/trmanager"
 	"gophermart-loyalty/internal/gopherman/model"
 	"testing"
 	"time"
@@ -32,7 +33,7 @@ func TestWithdrawalRepo_Add(t *testing.T) {
 	m.MatchExpectationsInOrder(false)
 
 	sqlDB := &conn.DB{DB: db}
-	r := &WithdrawalRepo{db: sqlDB}
+	r := &WithdrawalRepo{repoBase: repoBase{db: sqlDB}}
 
 	userID := int64(7)
 	orderID := "w1"
@@ -50,7 +51,8 @@ func TestWithdrawalRepo_Add(t *testing.T) {
 
 	m.ExpectRollback()
 
-	if err := r.Add(ctx, &conn.Tx{Tx: txSQL}, &model.Withdrawal{UserID: userID, OrderID: orderID, Sum: sum}); err != nil {
+	txCtx := trmanager.WithTx(ctx, &conn.Tx{Tx: txSQL})
+	if err := r.Add(txCtx, &model.Withdrawal{UserID: userID, OrderID: orderID, Sum: sum}); err != nil {
 		t.Fatalf("Add() error = %v, want nil", err)
 	}
 
@@ -73,7 +75,7 @@ func TestWithdrawalRepo_GetByUserID(t *testing.T) {
 	m.MatchExpectationsInOrder(false)
 
 	sqlDB := &conn.DB{DB: db}
-	r := &WithdrawalRepo{db: sqlDB}
+	r := &WithdrawalRepo{repoBase: repoBase{db: sqlDB}}
 
 	createdAt := time.Now().Add(-time.Hour)
 	updatedAt := time.Now()

@@ -22,12 +22,12 @@ type UserRepository interface {
 	Register(ctx context.Context, login, pass, ip string) (*model.User, error)
 	CreateSession(ctx context.Context, uid int64, ip string) (string, error)
 	UserIDFromSession(ctx context.Context, token string) (int64, error)
-	IncrementWithdrawn(ctx context.Context, tx *conn.Tx, w *model.Withdrawal) error
-	IncrementBalance(ctx context.Context, tx *conn.Tx, userID int64, increment float64) error
+	IncrementWithdrawn(ctx context.Context, w *model.Withdrawal) error
+	IncrementBalance(ctx context.Context, userID int64, increment float64) error
 }
 
 type userRepo struct {
-	db        *conn.DB
+	repoBase  repoBase
 	loginToID *storage.MemStorage[string, int64]
 	usersByID *storage.MemStorage[int64, *model.User]
 	sessions  *storage.MemStorage[string, *model.Sessions]
@@ -52,7 +52,8 @@ func NewUserRepository(db *conn.DB) UserRepository {
 	loginToID := storage.NewMemStorage[string, int64]()
 	usersByID := storage.NewMemStorage[int64, *model.User]()
 	sessStorage := storage.NewMemStorage[string, *model.Sessions]()
-	return &userRepo{db: db, loginToID: loginToID, usersByID: usersByID, sessions: sessStorage}
+
+	return &userRepo{repoBase: repoBase{db: db}, loginToID: loginToID, usersByID: usersByID, sessions: sessStorage}
 }
 
 func (r *userRepo) GetByLogin(ctx context.Context, login string) (*model.User, error) {
@@ -61,7 +62,7 @@ func (r *userRepo) GetByLogin(ctx context.Context, login string) (*model.User, e
 	}
 	var dbUser model.User
 	var lastIP sql.NullString
-	err := r.db.DB.QueryRowContext(ctx,
+	err := r.repoBase.q(ctx).QueryRowContext(ctx,
 		userGetByLoginQuery,
 		login,
 	).Scan(&dbUser.ID, &dbUser.Login, &dbUser.Pass, &dbUser.CreatedAt, &dbUser.UpdatedAt, &lastIP, &dbUser.Balance, &dbUser.Withdrawn)
@@ -83,7 +84,7 @@ func (r *userRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
 	}
 	var dbUser model.User
 	var lastIP sql.NullString
-	err = r.db.DB.QueryRowContext(ctx,
+	err = r.repoBase.q(ctx).QueryRowContext(ctx,
 		UserGetByIDQuery,
 		id,
 	).Scan(&dbUser.ID, &dbUser.Login, &dbUser.Pass, &dbUser.CreatedAt, &dbUser.UpdatedAt, &lastIP, &dbUser.Balance, &dbUser.Withdrawn)
@@ -105,7 +106,7 @@ func (r *userRepo) Register(ctx context.Context, login, pass, ip string) (*model
 	}
 	var u model.User
 	var lastIP sql.NullString
-	err = r.db.QueryRowContext(ctx,
+	err = r.repoBase.q(ctx).QueryRowContext(ctx,
 		userRegisterQuery,
 		login, hash, ip,
 	).Scan(&u.ID, &u.Login, &u.Pass, &u.CreatedAt, &u.UpdatedAt, &lastIP)
@@ -124,7 +125,7 @@ func (r *userRepo) UpdateLastIP(ctx context.Context, userID int64, ip string) er
 	if err != nil {
 		return labelerrors.NewLabelError(constant.LabelRepository+".User.UpdateLastIP.GetByID", err)
 	}
-	_, err = r.db.ExecContext(ctx, userUpdateLastIPQuery, ip, userID)
+	_, err = r.repoBase.q(ctx).ExecContext(ctx, userUpdateLastIPQuery, ip, userID)
 	if err != nil {
 		return labelerrors.NewLabelError(constant.LabelRepository+".User.UpdateLastIP.Exec", err)
 	}
@@ -143,7 +144,7 @@ func (r *userRepo) CreateSession(ctx context.Context, userID int64, ip string) (
 	if err != nil {
 		return "", err
 	}
-	_, err = r.db.ExecContext(ctx,
+	_, err = r.repoBase.q(ctx).ExecContext(ctx,
 		userUpsertSessionQuery,
 		tokenHash, userID, expiresAt, ip)
 	if err != nil {
@@ -165,7 +166,7 @@ func (r *userRepo) UserIDFromSession(ctx context.Context, token string) (int64, 
 	}
 	var dbSession model.Sessions
 	var ipNull sql.NullString
-	err = r.db.DB.QueryRowContext(ctx,
+	err = r.repoBase.q(ctx).QueryRowContext(ctx,
 		userUserIDFromSessionQuery,
 		tokenHash).Scan(&dbSession.UserID, &dbSession.ExpiresAt, &ipNull, &dbSession.CreatedAt)
 	if err != nil {
@@ -178,14 +179,14 @@ func (r *userRepo) UserIDFromSession(ctx context.Context, token string) (int64, 
 	_ = r.sessions.Set(ctx, tokenHash, &dbSession)
 	return dbSession.UserID, nil
 }
-func (r *userRepo) IncrementWithdrawn(ctx context.Context, tx *conn.Tx, w *model.Withdrawal) error {
+func (r *userRepo) IncrementWithdrawn(ctx context.Context, w *model.Withdrawal) error {
 	u, err := r.GetByID(ctx, w.UserID)
 	if err != nil {
 		return err
 	}
 	u.Balance -= w.Sum
 	u.Withdrawn += w.Sum
-	_, err = tx.ExecContext(ctx,
+	_, err = r.repoBase.q(ctx).ExecContext(ctx,
 		userIncrementWithdrawnQuery,
 		u.Balance, u.Withdrawn, u.ID)
 	if err != nil {
@@ -198,7 +199,7 @@ func (r *userRepo) IncrementWithdrawn(ctx context.Context, tx *conn.Tx, w *model
 
 	return nil
 }
-func (r *userRepo) IncrementBalance(ctx context.Context, tx *conn.Tx, userID int64, increment float64) error {
+func (r *userRepo) IncrementBalance(ctx context.Context, userID int64, increment float64) error {
 	if increment == 0 {
 		return nil
 	}
@@ -209,7 +210,7 @@ func (r *userRepo) IncrementBalance(ctx context.Context, tx *conn.Tx, userID int
 	fmt.Println(u.ID)
 	u.Balance += increment
 	fmt.Println(u.Balance)
-	_, err = tx.ExecContext(ctx,
+	_, err = r.repoBase.q(ctx).ExecContext(ctx,
 		userIncrementBalanceQuery,
 		u.Balance, u.ID)
 	if err != nil {

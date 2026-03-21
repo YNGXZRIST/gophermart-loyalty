@@ -288,7 +288,7 @@ func TestHandler_GetOrders(t *testing.T) {
 		}
 	})
 
-	t.Run("empty_result_200", func(t *testing.T) {
+	t.Run("empty_result_204", func(t *testing.T) {
 		userID := int64(55)
 
 		D, mockSQL := newMockConnDB(t)
@@ -311,19 +311,11 @@ func TestHandler_GetOrders(t *testing.T) {
 
 		handler.GetOrders(w, r)
 
-		if got, want := w.Code, http.StatusOK; got != want {
+		if got, want := w.Code, http.StatusNoContent; got != want {
 			t.Fatalf("GetOrders status code = %d, want %d", got, want)
 		}
 		if err := mockSQL.ExpectationsWereMet(); err != nil {
 			t.Fatalf("sqlmock expectations not met: %v", err)
-		}
-
-		var resp []model.Order
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("unmarshal response: %v", err)
-		}
-		if len(resp) != 0 {
-			t.Fatalf("orders len = %d, want 0; body=%s", len(resp), string(w.Body.Bytes()))
 		}
 	})
 

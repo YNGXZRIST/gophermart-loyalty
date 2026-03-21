@@ -83,45 +83,25 @@ func (s *Service) AddWithdrawal(ctx context.Context, in WithdrawalInput) Withdra
 			},
 		}
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return WithdrawOutput{
-			Response: Response{
-				Code: http.StatusInternalServerError,
-				Err:  fmt.Errorf("begin tx: %w", err),
-			},
-		}
-	}
-	defer tx.Rollback()
 	withdrawal := &model.Withdrawal{
 		UserID:  in.UserID,
 		OrderID: orderID,
 		Sum:     in.Amount,
 	}
-	err = s.Rep.Withdrawal.Add(ctx, tx, withdrawal)
-	if err != nil {
-		return WithdrawOutput{
-			Response: Response{
-				Code: http.StatusInternalServerError,
-				Err:  fmt.Errorf("add withdrawal: %w", err),
-			},
+	err = s.TrManager.WithinTx(ctx, nil, func(ctx context.Context) error {
+		if err := s.Rep.Withdrawal.Add(ctx, withdrawal); err != nil {
+			return fmt.Errorf("add withdrawal: %w", err)
 		}
-	}
-	err = s.Rep.User.IncrementWithdrawn(ctx, tx, withdrawal)
-	if err != nil {
-		return WithdrawOutput{
-			Response: Response{
-				Code: http.StatusInternalServerError,
-				Err:  fmt.Errorf("increment withdrawn: %w", err),
-			},
+		if err := s.Rep.User.IncrementWithdrawn(ctx, withdrawal); err != nil {
+			return fmt.Errorf("increment withdrawn: %w", err)
 		}
-	}
-	err = tx.Commit()
+		return nil
+	})
 	if err != nil {
 		return WithdrawOutput{
 			Response: Response{
 				Code: http.StatusInternalServerError,
-				Err:  fmt.Errorf("commit transaction error: %w", err),
+				Err:  err,
 			},
 		}
 	}
@@ -129,4 +109,5 @@ func (s *Service) AddWithdrawal(ctx context.Context, in WithdrawalInput) Withdra
 		Response: Response{Code: http.StatusOK},
 		Withdraw: withdrawal,
 	}
+
 }

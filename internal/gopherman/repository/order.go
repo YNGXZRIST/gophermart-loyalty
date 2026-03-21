@@ -29,15 +29,15 @@ type OrderRepository interface {
 	Add(ctx context.Context, userID int64, orderID string) error
 	GetByUserID(ctx context.Context, userID int64) ([]*model.Order, error)
 	GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order, error)
-	UpdateOrderAccrual(ctx context.Context, tx *conn.Tx, order *model.Order) error
+	UpdateOrderAccrual(ctx context.Context, order *model.Order) error
 }
 
 type orderRepo struct {
-	db *conn.DB
+	repoBase
 }
 
 func NewOrderRepository(db *conn.DB) OrderRepository {
-	return &orderRepo{db: db}
+	return &orderRepo{repoBase: repoBase{db: db}}
 }
 
 func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error {
@@ -57,7 +57,7 @@ func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error
 		}
 		return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.ExistsOther", ErrOrderExistsOther)
 	}
-	_, err = r.db.ExecContext(ctx,
+	_, err = r.repoBase.q(ctx).ExecContext(ctx,
 		OrderAddOrderQuery,
 		userID, orderID)
 	if err != nil {
@@ -73,7 +73,7 @@ func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error
 
 func (r *orderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Order, error) {
 	var list []*model.Order
-	rows, err := r.db.QueryContext(ctx,
+	rows, err := r.repoBase.q(ctx).QueryContext(ctx,
 		OrderGetByUidQuery,
 		userID)
 	if err != nil {
@@ -107,7 +107,7 @@ func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 	const chunkSize = 1
 	var list []*model.Order
 	for {
-		rows, err := r.db.QueryContext(ctx,
+		rows, err := r.repoBase.q(ctx).QueryContext(ctx,
 			OrderGetPendingOrdersWithLimitQuery,
 			lastID, chunkSize)
 		if err != nil {
@@ -142,9 +142,9 @@ func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 	}
 	return list, nil
 }
+func (r *orderRepo) UpdateOrderAccrual(ctx context.Context, order *model.Order) error {
 
-func (r *orderRepo) UpdateOrderAccrual(ctx context.Context, tx *conn.Tx, order *model.Order) error {
-	_, err := tx.ExecContext(ctx, OrderUpdatePendingOrderQuery, order.Status, order.Accrual, order.ID)
+	_, err := r.repoBase.q(ctx).ExecContext(ctx, OrderUpdatePendingOrderQuery, order.Status, order.Accrual, order.ID)
 	if err != nil {
 		return labelerrors.NewLabelError(constant.LabelRepository+".Order.UpdateOrderAccrual.Exec", err)
 	}

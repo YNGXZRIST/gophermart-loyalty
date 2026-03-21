@@ -151,7 +151,7 @@ func TestService_AddWithdrawal(t *testing.T) {
 			in: WithdrawalInput{UserID: uid, OrderID: validOrder, Amount: 25},
 			setup: func(u *mock.MockUserRepository, w *mock.MockWithdrawalRepository) {
 				u.EXPECT().GetByID(ctx, uid).Return(&model.User{ID: uid, Balance: 100}, nil)
-				w.EXPECT().Add(ctx, gomock.Any(), gomock.Any()).Return(errors.New("insert fail"))
+				w.EXPECT().Add(gomock.Any(), gomock.Any()).Return(errors.New("insert fail"))
 			},
 			wantCode: http.StatusInternalServerError,
 			wantErr:  true,
@@ -165,8 +165,8 @@ func TestService_AddWithdrawal(t *testing.T) {
 			in: WithdrawalInput{UserID: uid, OrderID: validOrder, Amount: 25},
 			setup: func(u *mock.MockUserRepository, w *mock.MockWithdrawalRepository) {
 				u.EXPECT().GetByID(ctx, uid).Return(&model.User{ID: uid, Balance: 100}, nil)
-				w.EXPECT().Add(ctx, gomock.Any(), gomock.Any()).Return(nil)
-				u.EXPECT().IncrementWithdrawn(ctx, gomock.Any(), gomock.Any()).Return(errors.New("upd fail"))
+				w.EXPECT().Add(gomock.Any(), gomock.Any()).Return(nil)
+				u.EXPECT().IncrementWithdrawn(gomock.Any(), gomock.Any()).Return(errors.New("upd fail"))
 			},
 			wantCode: http.StatusInternalServerError,
 			wantErr:  true,
@@ -180,14 +180,14 @@ func TestService_AddWithdrawal(t *testing.T) {
 			in: WithdrawalInput{UserID: uid, OrderID: validOrder, Amount: 30},
 			setup: func(u *mock.MockUserRepository, w *mock.MockWithdrawalRepository) {
 				u.EXPECT().GetByID(ctx, uid).Return(&model.User{ID: uid, Balance: 100}, nil)
-				w.EXPECT().Add(ctx, gomock.Any(), gomock.AssignableToTypeOf(&model.Withdrawal{})).DoAndReturn(
-					func(_ context.Context, _ *conn.Tx, wd *model.Withdrawal) error {
+				w.EXPECT().Add(gomock.Any(), gomock.AssignableToTypeOf(&model.Withdrawal{})).DoAndReturn(
+					func(_ context.Context, wd *model.Withdrawal) error {
 						if wd.OrderID != validOrder || wd.Sum != 30 || wd.UserID != uid {
 							t.Errorf("withdrawal fields: %+v", wd)
 						}
 						return nil
 					})
-				u.EXPECT().IncrementWithdrawn(ctx, gomock.Any(), gomock.AssignableToTypeOf(&model.Withdrawal{})).Return(nil)
+				u.EXPECT().IncrementWithdrawn(gomock.Any(), gomock.AssignableToTypeOf(&model.Withdrawal{})).Return(nil)
 			},
 			wantCode: http.StatusOK,
 			check: func(t *testing.T, out WithdrawOutput) {

@@ -6,7 +6,6 @@ package mock
 
 import (
 	context "context"
-	conn "gophermart-loyalty/internal/gopherman/db/conn"
 	model "gophermart-loyalty/internal/gopherman/model"
 	reflect "reflect"
 
@@ -82,31 +81,31 @@ func (mr *MockUserRepositoryMockRecorder) GetByLogin(ctx, login interface{}) *go
 }
 
 // IncrementBalance mocks base method.
-func (m *MockUserRepository) IncrementBalance(ctx context.Context, tx *conn.Tx, userId int64, increment float64) error {
+func (m *MockUserRepository) IncrementBalance(ctx context.Context, userId int64, increment float64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IncrementBalance", ctx, tx, userId, increment)
+	ret := m.ctrl.Call(m, "IncrementBalance", ctx, userId, increment)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // IncrementBalance indicates an expected call of IncrementBalance.
-func (mr *MockUserRepositoryMockRecorder) IncrementBalance(ctx, tx, userId, increment interface{}) *gomock.Call {
+func (mr *MockUserRepositoryMockRecorder) IncrementBalance(ctx, userId, increment interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementBalance", reflect.TypeOf((*MockUserRepository)(nil).IncrementBalance), ctx, tx, userId, increment)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementBalance", reflect.TypeOf((*MockUserRepository)(nil).IncrementBalance), ctx, userId, increment)
 }
 
 // IncrementWithdrawn mocks base method.
-func (m *MockUserRepository) IncrementWithdrawn(ctx context.Context, tx *conn.Tx, w *model.Withdrawal) error {
+func (m *MockUserRepository) IncrementWithdrawn(ctx context.Context, w *model.Withdrawal) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IncrementWithdrawn", ctx, tx, w)
+	ret := m.ctrl.Call(m, "IncrementWithdrawn", ctx, w)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // IncrementWithdrawn indicates an expected call of IncrementWithdrawn.
-func (mr *MockUserRepositoryMockRecorder) IncrementWithdrawn(ctx, tx, w interface{}) *gomock.Call {
+func (mr *MockUserRepositoryMockRecorder) IncrementWithdrawn(ctx, w interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementWithdrawn", reflect.TypeOf((*MockUserRepository)(nil).IncrementWithdrawn), ctx, tx, w)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncrementWithdrawn", reflect.TypeOf((*MockUserRepository)(nil).IncrementWithdrawn), ctx, w)
 }
 
 // Register mocks base method.

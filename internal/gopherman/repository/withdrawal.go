@@ -9,11 +9,11 @@ import (
 )
 
 type WithdrawalRepository interface {
-	Add(ctx context.Context, tx *conn.Tx, withdrawal *model.Withdrawal) error
+	Add(ctx context.Context, withdrawal *model.Withdrawal) error
 	GetByUserID(ctx context.Context, userID int64) ([]*model.Withdrawal, error)
 }
 type WithdrawalRepo struct {
-	db *conn.DB
+	repoBase
 }
 
 const (
@@ -22,12 +22,12 @@ const (
 )
 
 func NewWithdrawalRepository(db *conn.DB) *WithdrawalRepo {
-	return &WithdrawalRepo{db: db}
+	return &WithdrawalRepo{repoBase: repoBase{db: db}}
 }
 
-func (r *WithdrawalRepo) Add(ctx context.Context, tx *conn.Tx, w *model.Withdrawal) error {
+func (r *WithdrawalRepo) Add(ctx context.Context, w *model.Withdrawal) error {
 
-	_, err := tx.ExecContext(ctx,
+	_, err := r.repoBase.q(ctx).ExecContext(ctx,
 		withdrawalAddQuery,
 		w.UserID, w.OrderID, w.Sum)
 	if err != nil {
@@ -36,7 +36,7 @@ func (r *WithdrawalRepo) Add(ctx context.Context, tx *conn.Tx, w *model.Withdraw
 	return nil
 }
 func (r *WithdrawalRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Withdrawal, error) {
-	rows, err := r.db.QueryContext(ctx,
+	rows, err := r.repoBase.q(ctx).QueryContext(ctx,
 		withdrawalGetByUserIDQuery,
 		userID)
 	if err != nil {

@@ -24,6 +24,10 @@ func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set(constant.ContentTypeHeader, constant.ApplicationJSON)
+	if len(res.Withdrawals) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	bytes, err := service.WithdrawalsJSON(res.Withdrawals)
 	if err != nil {

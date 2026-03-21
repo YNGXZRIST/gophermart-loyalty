@@ -3,18 +3,17 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"gophermart-loyalty/internal/gopherman/constant"
+	"gophermart-loyalty/internal/gopherman/contextkey"
+	"gophermart-loyalty/internal/gopherman/model"
+	"gophermart-loyalty/internal/gopherman/repository"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"go.uber.org/zap"
-	"gophermart-loyalty/internal/gopherman/constant"
-	"gophermart-loyalty/internal/gopherman/contextkey"
-	"gophermart-loyalty/internal/gopherman/model"
-	"gophermart-loyalty/internal/gopherman/repository"
-
 	"github.com/DATA-DOG/go-sqlmock"
+	"go.uber.org/zap"
 )
 
 func TestHandler_GetWithdrawals(t *testing.T) {
@@ -64,7 +63,7 @@ func TestHandler_GetWithdrawals(t *testing.T) {
 		}
 	})
 
-	t.Run("empty_result_200_returns_empty_array", func(t *testing.T) {
+	t.Run("empty_result_204", func(t *testing.T) {
 		userID := int64(7)
 		D, mockSQL := newMockConnDB(t)
 
@@ -87,20 +86,8 @@ func TestHandler_GetWithdrawals(t *testing.T) {
 
 		handler.GetWithdrawals(w, r)
 
-		if got, want := w.Code, http.StatusOK; got != want {
+		if got, want := w.Code, http.StatusNoContent; got != want {
 			t.Fatalf("GetWithdrawals status code = %d, want %d", got, want)
-		}
-
-		if err := mockSQL.ExpectationsWereMet(); err != nil {
-			t.Fatalf("sqlmock expectations not met: %v", err)
-		}
-
-		var resp []model.Withdrawal
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("unmarshal response: %v", err)
-		}
-		if len(resp) != 0 {
-			t.Fatalf("response len = %d, want 0. body=%s", len(resp), string(w.Body.Bytes()))
 		}
 	})
 

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"gophermart-loyalty/internal/gopherman/db/conn"
+	"gophermart-loyalty/internal/gopherman/db/trmanager"
 	"gophermart-loyalty/internal/gopherman/model"
 	"gophermart-loyalty/internal/gopherman/repository/mock"
 	"gophermart-loyalty/pkg/storage"
@@ -248,7 +249,7 @@ func Test_userRepo_IncrementBalance(t *testing.T) {
 
 	t.Run("zero_increment_no_db_calls", func(t *testing.T) {
 		r := &userRepo{}
-		if err := r.IncrementBalance(ctx, nil, 123, 0); err != nil {
+		if err := r.IncrementBalance(ctx, 123, 0); err != nil {
 			t.Fatalf("IncrementBalance() error = %v, want nil", err)
 		}
 	})
@@ -263,7 +264,7 @@ func Test_userRepo_IncrementBalance(t *testing.T) {
 
 		sqlDB := &conn.DB{DB: db}
 		r := &userRepo{
-			db:        sqlDB,
+			repoBase:  repoBase{db: sqlDB},
 			loginToID: storage.NewMemStorage[string, int64](),
 			usersByID: storage.NewMemStorage[int64, *model.User](),
 			sessions:  storage.NewMemStorage[string, *model.Sessions](),
@@ -293,7 +294,8 @@ func Test_userRepo_IncrementBalance(t *testing.T) {
 			WithArgs(expectedBalance, userID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
-		if err := r.IncrementBalance(ctx, &conn.Tx{Tx: txSQL}, userID, increment); err != nil {
+		txCtx := trmanager.WithTx(ctx, &conn.Tx{Tx: txSQL})
+		if err := r.IncrementBalance(txCtx, userID, increment); err != nil {
 			t.Fatalf("IncrementBalance() error = %v, want nil", err)
 		}
 
@@ -324,7 +326,7 @@ func Test_userRepo_IncrementWithdrawn(t *testing.T) {
 
 		sqlDB := &conn.DB{DB: db}
 		r := &userRepo{
-			db:        sqlDB,
+			repoBase:  repoBase{db: sqlDB},
 			loginToID: storage.NewMemStorage[string, int64](),
 			usersByID: storage.NewMemStorage[int64, *model.User](),
 			sessions:  storage.NewMemStorage[string, *model.Sessions](),
@@ -356,7 +358,8 @@ func Test_userRepo_IncrementWithdrawn(t *testing.T) {
 			WithArgs(expectedBalance, expectedWithdrawn, userID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
-		if err := r.IncrementWithdrawn(ctx, &conn.Tx{Tx: txSQL}, &model.Withdrawal{UserID: userID, OrderID: "w1", Sum: sum}); err != nil {
+		txCtx := trmanager.WithTx(ctx, &conn.Tx{Tx: txSQL})
+		if err := r.IncrementWithdrawn(txCtx, &model.Withdrawal{UserID: userID, OrderID: "w1", Sum: sum}); err != nil {
 			t.Fatalf("IncrementWithdrawn() error = %v, want nil", err)
 		}
 
@@ -388,7 +391,7 @@ func Test_userRepo_UpdateLastIP(t *testing.T) {
 
 	sqlDB := &conn.DB{DB: db}
 	r := &userRepo{
-		db:        sqlDB,
+		repoBase:  repoBase{db: sqlDB},
 		loginToID: storage.NewMemStorage[string, int64](),
 		usersByID: storage.NewMemStorage[int64, *model.User](),
 		sessions:  storage.NewMemStorage[string, *model.Sessions](),

@@ -24,6 +24,10 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(res.Code)
 		return
 	}
+	if len(res.Orders) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	data, err := service.OrdersJSON(res.Orders)
 	if err != nil {
 		lerr := labelerrors.NewLabelError(constant.LabelAPIHandler+".GetOrders.Marshal", err)

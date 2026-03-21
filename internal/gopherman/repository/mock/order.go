@@ -6,7 +6,6 @@ package mock
 
 import (
 	context "context"
-	conn "gophermart-loyalty/internal/gopherman/db/conn"
 	model "gophermart-loyalty/internal/gopherman/model"
 	reflect "reflect"
 
@@ -81,15 +80,15 @@ func (mr *MockOrderRepositoryMockRecorder) GetOrdersPendingAccrual(ctx interface
 }
 
 // UpdateOrderAccrual mocks base method.
-func (m *MockOrderRepository) UpdateOrderAccrual(ctx context.Context, tx *conn.Tx, order *model.Order) error {
+func (m *MockOrderRepository) UpdateOrderAccrual(ctx context.Context, order *model.Order) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateOrderAccrual", ctx, tx, order)
+	ret := m.ctrl.Call(m, "UpdateOrderAccrual", ctx, order)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateOrderAccrual indicates an expected call of UpdateOrderAccrual.
-func (mr *MockOrderRepositoryMockRecorder) UpdateOrderAccrual(ctx, tx, order interface{}) *gomock.Call {
+func (mr *MockOrderRepositoryMockRecorder) UpdateOrderAccrual(ctx, order interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateOrderAccrual", reflect.TypeOf((*MockOrderRepository)(nil).UpdateOrderAccrual), ctx, tx, order)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateOrderAccrual", reflect.TypeOf((*MockOrderRepository)(nil).UpdateOrderAccrual), ctx, order)
 }

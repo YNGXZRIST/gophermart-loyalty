@@ -6,7 +6,6 @@ package mock
 
 import (
 	context "context"
-	conn "gophermart-loyalty/internal/gopherman/db/conn"
 	model "gophermart-loyalty/internal/gopherman/model"
 	reflect "reflect"
 
@@ -37,17 +36,17 @@ func (m *MockWithdrawalRepository) EXPECT() *MockWithdrawalRepositoryMockRecorde
 }
 
 // Add mocks base method.
-func (m *MockWithdrawalRepository) Add(ctx context.Context, tx *conn.Tx, withdrawal *model.Withdrawal) error {
+func (m *MockWithdrawalRepository) Add(ctx context.Context, withdrawal *model.Withdrawal) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Add", ctx, tx, withdrawal)
+	ret := m.ctrl.Call(m, "Add", ctx, withdrawal)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Add indicates an expected call of Add.
-func (mr *MockWithdrawalRepositoryMockRecorder) Add(ctx, tx, withdrawal interface{}) *gomock.Call {
+func (mr *MockWithdrawalRepositoryMockRecorder) Add(ctx, withdrawal interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockWithdrawalRepository)(nil).Add), ctx, tx, withdrawal)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockWithdrawalRepository)(nil).Add), ctx, withdrawal)
 }
 
 // GetByUserID mocks base method.
