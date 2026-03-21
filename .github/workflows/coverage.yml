@@ -1,0 +1,46 @@
+name: coverage
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    container: golang:1.26
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate test coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          # cmd/statictest — отдельная утилита для statictest, тестов нет
+          go test $(go list ./... | grep -v '/cmd/statictest$') \
+            -coverprofile=cover.out -covermode=atomic -coverpkg=./...
+          go tool cover -func=cover.out
+
+      - name: Check test coverage (thresholds)
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          config: .testcoverage.yml
+          profile: cover.out
+
+      - name: Publish coverage badge to repository (main/master push only)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          config: .testcoverage.yml
+          profile: cover.out
+          git-token: ${{ secrets.GITHUB_TOKEN }}
+          git-branch: ${{ github.ref_name }}
+          git-file-name: .badges/${{ github.ref_name }}/coverage.svg
