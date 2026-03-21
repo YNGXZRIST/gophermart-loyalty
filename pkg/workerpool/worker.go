@@ -5,19 +5,19 @@ import (
 )
 
 type Worker struct {
-	ctx context.Context
-	tCh chan Task
-	rCh chan Task
+	tCh    chan Task
+	rCh    chan Task
+	quitCh chan any
 }
 
-func NewWorker(ctx context.Context, tCh, rCh chan Task) *Worker {
-	return &Worker{ctx: ctx, tCh: tCh, rCh: rCh}
+func NewWorker(tCh, rCh chan Task) *Worker {
+	return &Worker{tCh: tCh, rCh: rCh}
 }
 
-func (w *Worker) StartBg() {
+func (w *Worker) StartBg(ctx context.Context) {
 	for {
 		select {
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			return
 		case t, ok := <-w.tCh:
 			if !ok {
@@ -25,7 +25,11 @@ func (w *Worker) StartBg() {
 			}
 			t.process()
 			if t.NeedResult {
-				w.rCh <- t
+				select {
+				case w.rCh <- t:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}

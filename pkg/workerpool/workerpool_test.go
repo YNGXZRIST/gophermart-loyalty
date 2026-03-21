@@ -53,8 +53,8 @@ func TestWorker_StartBg_WithResult(t *testing.T) {
 	tCh := make(chan Task, 1)
 	rCh := make(chan Task, 1)
 
-	worker := NewWorker(ctx, tCh, rCh)
-	go worker.StartBg()
+	worker := NewWorker(tCh, rCh)
+	go worker.StartBg(ctx)
 
 	task := NewTask(func(x any) (any, error) {
 		return "ok", nil
@@ -82,8 +82,8 @@ func TestWorker_StartBg_NoResult(t *testing.T) {
 	tCh := make(chan Task, 1)
 	rCh := make(chan Task, 1)
 
-	worker := NewWorker(ctx, tCh, rCh)
-	go worker.StartBg()
+	worker := NewWorker(tCh, rCh)
+	go worker.StartBg(ctx)
 
 	called := make(chan struct{}, 1)
 	task := NewTask(func(x any) (any, error) {

@@ -9,6 +9,7 @@ type Pool struct {
 	rCh     chan Task
 	tCh     chan Task
 	tRes    *[]Task
+	cancel  func()
 }
 
 func NewPool(c int) *Pool {
@@ -21,10 +22,12 @@ func NewPool(c int) *Pool {
 	return w
 }
 func (p *Pool) StartBg(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	p.cancel = cancel
 	for i := 0; i < cap(p.workers); i++ {
-		worker := NewWorker(ctx, p.tCh, p.rCh)
+		worker := NewWorker(p.tCh, p.rCh)
 		p.workers = append(p.workers, worker)
-		go worker.StartBg()
+		go worker.StartBg(ctx)
 	}
 
 }
@@ -33,4 +36,9 @@ func (p *Pool) Add(task *Task) {
 }
 func (p *Pool) Get() Task {
 	return <-p.rCh
+}
+func (p *Pool) Stop() {
+	if p.cancel != nil {
+		p.cancel()
+	}
 }
