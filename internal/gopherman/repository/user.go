@@ -10,15 +10,20 @@ import (
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/model"
-	"gophermart-loyalty/pkg/storage"
+	"strconv"
 	"time"
+
+	"github.com/patrickmn/go-cache"
 )
 
 type UserRepo struct {
 	repoBase  repoBase
-	loginToID *storage.MemStorage[string, int64]
-	usersByID *storage.MemStorage[int64, *model.User]
-	sessions  *storage.MemStorage[string, *model.Sessions]
+	loginToID *cache.Cache
+	usersByID *cache.Cache
+	sessions  *cache.Cache
+	//loginToID *storage.MemStorage[string, int64]
+	//usersByID *storage.MemStorage[int64, *model.User]
+	//sessions  *storage.MemStorage[string, *model.Sessions]
 }
 
 const (
@@ -37,17 +42,32 @@ const (
 )
 
 func NewUserRepository(db *conn.DB) *UserRepo {
-	loginToID := storage.NewMemStorage[string, int64]()
-	usersByID := storage.NewMemStorage[int64, *model.User]()
-	sessStorage := storage.NewMemStorage[string, *model.Sessions]()
+	loginToID := cache.New(5*time.Minute, 10*time.Minute)
+	usersByID := cache.New(5*time.Minute, 10*time.Minute)
+	sessStorage := cache.New(5*time.Minute, 10*time.Minute)
 
 	return &UserRepo{repoBase: repoBase{db: db}, loginToID: loginToID, usersByID: usersByID, sessions: sessStorage}
 }
 
+func (r *UserRepo) setUserCache(u *model.User) {
+	r.loginToID.Set(u.Login, u.ID, cache.DefaultExpiration)
+	r.usersByID.Set(strconv.FormatInt(u.ID, 10), u, cache.DefaultExpiration)
+}
+
 func (r *UserRepo) GetByLogin(ctx context.Context, login string) (*model.User, error) {
-	if id, err := r.loginToID.Get(ctx, login); err == nil {
-		return r.GetByID(ctx, id)
+	id, found := r.loginToID.Get(login)
+	if found {
+		return r.GetByID(ctx, id.(int64))
 	}
+	u, err := r.GetByLoginForce(ctx, login)
+	if err != nil {
+		return nil, err
+	}
+	r.setUserCache(u)
+	return u, nil
+}
+
+func (r *UserRepo) GetByLoginForce(ctx context.Context, login string) (*model.User, error) {
 	var dbUser model.User
 	var lastIP sql.NullString
 	err := r.repoBase.q(ctx).QueryRowContext(ctx,
@@ -60,19 +80,28 @@ func (r *UserRepo) GetByLogin(ctx context.Context, login string) (*model.User, e
 	if lastIP.Valid {
 		dbUser.LastIP = lastIP.String
 	}
-	_ = r.loginToID.Set(ctx, login, dbUser.ID)
-	_ = r.usersByID.Set(ctx, dbUser.ID, &dbUser)
 	return &dbUser, nil
 }
 
 func (r *UserRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
-	u, err := r.usersByID.Get(ctx, id)
-	if err == nil {
-		return u, nil
+	c, found := r.usersByID.Get(strconv.FormatInt(id, 10))
+	if found {
+		u, ok := c.(*model.User)
+		if ok {
+			return u, nil
+		}
 	}
+	u, err := r.GetByIDForce(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	r.setUserCache(u)
+	return u, nil
+}
+func (r *UserRepo) GetByIDForce(ctx context.Context, id int64) (*model.User, error) {
 	var dbUser model.User
 	var lastIP sql.NullString
-	err = r.repoBase.q(ctx).QueryRowContext(ctx,
+	err := r.repoBase.q(ctx).QueryRowContext(ctx,
 		UserGetByIDQuery,
 		id,
 	).Scan(&dbUser.ID, &dbUser.Login, &dbUser.Pass, &dbUser.CreatedAt, &dbUser.UpdatedAt, &lastIP, &dbUser.Balance, &dbUser.Withdrawn)
@@ -82,8 +111,6 @@ func (r *UserRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
 	if lastIP.Valid {
 		dbUser.LastIP = lastIP.String
 	}
-	_ = r.loginToID.Set(ctx, dbUser.Login, dbUser.ID)
-	_ = r.usersByID.Set(ctx, dbUser.ID, &dbUser)
 	return &dbUser, nil
 }
 
@@ -104,12 +131,11 @@ func (r *UserRepo) Register(ctx context.Context, login, pass, ip string) (*model
 	if lastIP.Valid {
 		u.LastIP = lastIP.String
 	}
-	_ = r.loginToID.Set(ctx, login, u.ID)
-	_ = r.usersByID.Set(ctx, u.ID, &u)
+	r.setUserCache(&u)
 	return &u, nil
 }
 func (r *UserRepo) UpdateLastIP(ctx context.Context, userID int64, ip string) error {
-	u, err := r.GetByID(ctx, userID)
+	u, err := r.GetByIDForce(ctx, userID)
 	if err != nil {
 		return labelerrors.NewLabelError(labelRepository+".User.UpdateLastIP.GetByID", err)
 	}
@@ -118,6 +144,7 @@ func (r *UserRepo) UpdateLastIP(ctx context.Context, userID int64, ip string) er
 		return labelerrors.NewLabelError(labelRepository+".User.UpdateLastIP.Exec", err)
 	}
 	u.LastIP = ip
+	r.setUserCache(u)
 	return nil
 }
 func (r *UserRepo) CreateSession(ctx context.Context, userID int64, ip string) (string, error) {
@@ -138,23 +165,26 @@ func (r *UserRepo) CreateSession(ctx context.Context, userID int64, ip string) (
 	if err != nil {
 		return "", labelerrors.NewLabelError(labelRepository+".User.CreateSession.Upsert", err)
 	}
-	_ = r.sessions.Set(ctx, tokenHash, &model.Sessions{UserID: userID, TokenHash: tokenHash, ExpiresAt: expiresAt, IP: ip})
+	r.sessions.Set(tokenHash, &model.Sessions{UserID: userID, TokenHash: tokenHash, ExpiresAt: expiresAt, IP: ip}, cache.DefaultExpiration)
 	return token, nil
 }
 
 func (r *UserRepo) UserIDFromSession(ctx context.Context, token string) (int64, error) {
 	hash := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(hash[:])
-	cache, err := r.sessions.Get(ctx, tokenHash)
-	if err == nil {
-		if !cache.ExpiresAt.After(time.Now()) {
-			return 0, nil
+	c, found := r.sessions.Get(tokenHash)
+	if found {
+		s, ok := c.(*model.Sessions)
+		if ok {
+			if !s.ExpiresAt.After(time.Now()) {
+				return 0, nil
+			}
+			return s.UserID, nil
 		}
-		return cache.UserID, nil
 	}
 	var dbSession model.Sessions
 	var ipNull sql.NullString
-	err = r.repoBase.q(ctx).QueryRowContext(ctx,
+	err := r.repoBase.q(ctx).QueryRowContext(ctx,
 		UserUserIDFromSessionQuery,
 		tokenHash).Scan(&dbSession.UserID, &dbSession.ExpiresAt, &ipNull, &dbSession.CreatedAt)
 	if err != nil {
@@ -164,48 +194,45 @@ func (r *UserRepo) UserIDFromSession(ctx context.Context, token string) (int64, 
 		dbSession.IP = ipNull.String
 	}
 	dbSession.TokenHash = tokenHash
-	_ = r.sessions.Set(ctx, tokenHash, &dbSession)
+	r.sessions.Set(tokenHash, &dbSession, cache.DefaultExpiration)
 	return dbSession.UserID, nil
 }
 func (r *UserRepo) IncrementWithdrawn(ctx context.Context, w *model.Withdrawal) error {
-	u, err := r.GetByID(ctx, w.UserID)
+	u, err := r.GetByIDForce(ctx, w.UserID)
 	if err != nil {
 		return err
 	}
-	u.Balance -= w.Sum
-	u.Withdrawn += w.Sum
+	newBalance := u.Balance - w.Sum
+	newWithdrawn := u.Withdrawn + w.Sum
 	_, err = r.repoBase.q(ctx).ExecContext(ctx,
 		UserIncrementWithdrawnQuery,
-		u.Balance, u.Withdrawn, u.ID)
+		newBalance, newWithdrawn, u.ID)
 	if err != nil {
 		return labelerrors.NewLabelError(labelRepository+".User.IncrementWithdrawn.Exec", err)
 	}
-	err = r.usersByID.Set(ctx, u.ID, u)
-	if err != nil {
-		return labelerrors.NewLabelError(labelRepository+".User.IncrementWithdrawn.Cache", err)
-	}
-
+	u.Balance = newBalance
+	u.Withdrawn = newWithdrawn
+	r.setUserCache(u)
 	return nil
 }
 func (r *UserRepo) IncrementBalance(ctx context.Context, userID int64, increment float64) error {
 	if increment == 0 {
 		return nil
 	}
-	u, err := r.GetByID(ctx, userID)
+	u, err := r.GetByIDForce(ctx, userID)
 	if err != nil {
 		return labelerrors.NewLabelError(labelRepository+".User.IncrementBalance.GetByID", err)
 	}
-	u.Balance += increment
+	newBalance := u.Balance + increment
 	_, err = r.repoBase.q(ctx).ExecContext(ctx,
 		UserIncrementBalanceQuery,
-		u.Balance, u.ID)
+		newBalance, u.ID)
 	if err != nil {
 		return labelerrors.NewLabelError(labelRepository+".User.IncrementBalance.Exec", err)
 	}
-	err = r.usersByID.Set(ctx, u.ID, u)
-	if err != nil {
-		return labelerrors.NewLabelError(labelRepository+".User.IncrementBalance.Cache", err)
-	}
+	u.Balance = newBalance
+	r.setUserCache(u)
+
 	return nil
 
 }

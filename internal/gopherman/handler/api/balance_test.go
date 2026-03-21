@@ -133,6 +133,23 @@ func TestHandler_MakeWithdraw(t *testing.T) {
 			WithArgs(userID, orderID, amount).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
+		mockSQL.ExpectQuery(
+			repository.UserGetByIDQuery,
+		).
+			WithArgs(userID).
+			WillReturnRows(sqlmock.NewRows([]string{
+				"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn",
+			}).AddRow(
+				userID,
+				"test",
+				"hashed-pass",
+				createdAt,
+				updatedAt,
+				lastIP,
+				initialBalance,
+				initialWithdrawn,
+			))
+
 		updatedBalance := initialBalance - amount
 		updatedWithdrawn := initialWithdrawn + amount
 		mockSQL.ExpectExec(

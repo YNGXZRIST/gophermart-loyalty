@@ -7,11 +7,12 @@ import (
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/db/trmanager"
 	"gophermart-loyalty/internal/gopherman/model"
-	"gophermart-loyalty/pkg/storage"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/patrickmn/go-cache"
 )
 
 func Test_userRepo_GetByLogin(t *testing.T) {
@@ -45,16 +46,24 @@ func Test_userRepo_GetByLogin(t *testing.T) {
 		t.Fatalf("GetByLogin() got %+v, want id=%d login=%s lastIP=%s", got, userID, login, lastIP)
 	}
 
-	cachedID, err := r.loginToID.Get(ctx, login)
-	if err != nil {
-		t.Fatalf("loginToID.Get() error = %v", err)
+	cachedIDAny, found := r.loginToID.Get(login)
+	if !found {
+		t.Fatalf("loginToID.Get() miss for login=%s", login)
+	}
+	cachedID, ok := cachedIDAny.(int64)
+	if !ok {
+		t.Fatalf("loginToID.Get() type = %T, want int64", cachedIDAny)
 	}
 	if cachedID != userID {
 		t.Fatalf("loginToID.Get() = %d, want %d", cachedID, userID)
 	}
-	cachedUser, err := r.usersByID.Get(ctx, userID)
-	if err != nil {
-		t.Fatalf("usersByID.Get() error = %v", err)
+	cachedUserAny, found := r.usersByID.Get(strconv.FormatInt(userID, 10))
+	if !found {
+		t.Fatalf("usersByID.Get() miss for id=%d", userID)
+	}
+	cachedUser, ok := cachedUserAny.(*model.User)
+	if !ok {
+		t.Fatalf("usersByID.Get() type = %T, want *model.User", cachedUserAny)
 	}
 	if cachedUser.ID != userID || cachedUser.Login != login {
 		t.Fatalf("usersByID.Get() got %+v, want id=%d login=%s", cachedUser, userID, login)
@@ -96,19 +105,113 @@ func Test_userRepo_GetByID(t *testing.T) {
 		t.Fatalf("GetByID() got %+v, want id=%d login=%s lastIP=%s", got, userID, login, lastIP)
 	}
 
-	cachedID, err := r.loginToID.Get(ctx, login)
-	if err != nil {
-		t.Fatalf("loginToID.Get() error = %v", err)
+	cachedIDAny, found := r.loginToID.Get(login)
+	if !found {
+		t.Fatalf("loginToID.Get() miss for login=%s", login)
+	}
+	cachedID, ok := cachedIDAny.(int64)
+	if !ok {
+		t.Fatalf("loginToID.Get() type = %T, want int64", cachedIDAny)
 	}
 	if cachedID != userID {
 		t.Fatalf("loginToID.Get() = %d, want %d", cachedID, userID)
 	}
-	cachedUser, err := r.usersByID.Get(ctx, userID)
-	if err != nil {
-		t.Fatalf("usersByID.Get() error = %v", err)
+	cachedUserAny, found := r.usersByID.Get(strconv.FormatInt(userID, 10))
+	if !found {
+		t.Fatalf("usersByID.Get() miss for id=%d", userID)
+	}
+	cachedUser, ok := cachedUserAny.(*model.User)
+	if !ok {
+		t.Fatalf("usersByID.Get() type = %T, want *model.User", cachedUserAny)
 	}
 	if cachedUser.ID != userID || cachedUser.Login != login {
 		t.Fatalf("usersByID.Get() got %+v, want id=%d login=%s", cachedUser, userID, login)
+	}
+
+	if err := mockSQL.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations not met: %v", err)
+	}
+}
+
+func Test_userRepo_GetByLoginForce(t *testing.T) {
+	ctx := context.Background()
+	login := "force-login"
+	userID := int64(11)
+	pass := "pass"
+	lastIP := "10.0.0.1"
+	balance := 13.37
+	withdrawn := 1.23
+
+	db, mockSQL := newMockConnDB(t)
+	r := NewUserRepository(db)
+	mockSQL.MatchExpectationsInOrder(false)
+
+	createdAt := time.Now().Add(-time.Hour)
+	updatedAt := time.Now().Add(-time.Minute)
+
+	mockSQL.ExpectQuery(UserGetByLoginQuery).
+		WithArgs(login).
+		WillReturnRows(
+			sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn"}).
+				AddRow(userID, login, pass, createdAt, updatedAt, lastIP, balance, withdrawn),
+		)
+
+	got, err := r.GetByLoginForce(ctx, login)
+	if err != nil {
+		t.Fatalf("GetByLoginForce() error = %v", err)
+	}
+	if got.ID != userID || got.Login != login || got.LastIP != lastIP || got.Balance != balance || got.Withdrawn != withdrawn {
+		t.Fatalf("GetByLoginForce() got %+v, want id=%d login=%s lastIP=%s", got, userID, login, lastIP)
+	}
+
+	if _, found := r.loginToID.Get(login); found {
+		t.Fatalf("GetByLoginForce() unexpectedly populated loginToID cache")
+	}
+	if _, found := r.usersByID.Get(strconv.FormatInt(userID, 10)); found {
+		t.Fatalf("GetByLoginForce() unexpectedly populated usersByID cache")
+	}
+
+	if err := mockSQL.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations not met: %v", err)
+	}
+}
+
+func Test_userRepo_GetByIDForce(t *testing.T) {
+	ctx := context.Background()
+	userID := int64(12)
+	login := "force-id"
+	pass := "pass"
+	lastIP := "10.0.0.2"
+	balance := 7.77
+	withdrawn := 0.5
+
+	db, mockSQL := newMockConnDB(t)
+	r := NewUserRepository(db)
+	mockSQL.MatchExpectationsInOrder(false)
+
+	createdAt := time.Now().Add(-time.Hour)
+	updatedAt := time.Now().Add(-time.Minute)
+
+	mockSQL.ExpectQuery(UserGetByIDQuery).
+		WithArgs(userID).
+		WillReturnRows(
+			sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn"}).
+				AddRow(userID, login, pass, createdAt, updatedAt, lastIP, balance, withdrawn),
+		)
+
+	got, err := r.GetByIDForce(ctx, userID)
+	if err != nil {
+		t.Fatalf("GetByIDForce() error = %v", err)
+	}
+	if got.ID != userID || got.Login != login || got.LastIP != lastIP || got.Balance != balance || got.Withdrawn != withdrawn {
+		t.Fatalf("GetByIDForce() got %+v, want id=%d login=%s lastIP=%s", got, userID, login, lastIP)
+	}
+
+	if _, found := r.loginToID.Get(login); found {
+		t.Fatalf("GetByIDForce() unexpectedly populated loginToID cache")
+	}
+	if _, found := r.usersByID.Get(strconv.FormatInt(userID, 10)); found {
+		t.Fatalf("GetByIDForce() unexpectedly populated usersByID cache")
 	}
 
 	if err := mockSQL.ExpectationsWereMet(); err != nil {
@@ -145,16 +248,24 @@ func Test_userRepo_Register(t *testing.T) {
 		t.Fatalf("Register() got %+v, want id=%d login=%s passHash=%s lastIP=%s", got, userID, login, "returned-hash", ip)
 	}
 
-	cachedID, err := r.loginToID.Get(ctx, login)
-	if err != nil {
-		t.Fatalf("loginToID.Get() error = %v", err)
+	cachedIDAny, found := r.loginToID.Get(login)
+	if !found {
+		t.Fatalf("loginToID.Get() miss for login=%s", login)
+	}
+	cachedID, ok := cachedIDAny.(int64)
+	if !ok {
+		t.Fatalf("loginToID.Get() type = %T, want int64", cachedIDAny)
 	}
 	if cachedID != userID {
 		t.Fatalf("loginToID.Get() = %d, want %d", cachedID, userID)
 	}
-	cachedUser, err := r.usersByID.Get(ctx, userID)
-	if err != nil {
-		t.Fatalf("usersByID.Get() error = %v", err)
+	cachedUserAny, found := r.usersByID.Get(strconv.FormatInt(userID, 10))
+	if !found {
+		t.Fatalf("usersByID.Get() miss for id=%d", userID)
+	}
+	cachedUser, ok := cachedUserAny.(*model.User)
+	if !ok {
+		t.Fatalf("usersByID.Get() type = %T, want *model.User", cachedUserAny)
 	}
 	if cachedUser.ID != userID || cachedUser.Login != login {
 		t.Fatalf("usersByID.Get() got %+v, want id=%d login=%s", cachedUser, userID, login)
@@ -214,9 +325,13 @@ func Test_userRepo_CreateSession(t *testing.T) {
 	sum := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(sum[:])
 
-	cached, err := r.sessions.Get(ctx, tokenHash)
-	if err != nil {
-		t.Fatalf("sessions.Get() error = %v", err)
+	cachedAny, found := r.sessions.Get(tokenHash)
+	if !found {
+		t.Fatalf("sessions.Get() miss for tokenHash=%s", tokenHash)
+	}
+	cached, ok := cachedAny.(*model.Sessions)
+	if !ok {
+		t.Fatalf("sessions.Get() type = %T, want *model.Sessions", cachedAny)
 	}
 	if cached.UserID != userID || cached.TokenHash != tokenHash || cached.IP != ip {
 		t.Fatalf("cached session got %+v, want userID=%d tokenHash=%s ip=%s", cached, userID, tokenHash, ip)
@@ -251,9 +366,9 @@ func Test_userRepo_IncrementBalance(t *testing.T) {
 		sqlDB := &conn.DB{DB: db}
 		r := &UserRepo{
 			repoBase:  repoBase{db: sqlDB},
-			loginToID: storage.NewMemStorage[string, int64](),
-			usersByID: storage.NewMemStorage[int64, *model.User](),
-			sessions:  storage.NewMemStorage[string, *model.Sessions](),
+			loginToID: cache.New(5*time.Minute, 10*time.Minute),
+			usersByID: cache.New(5*time.Minute, 10*time.Minute),
+			sessions:  cache.New(5*time.Minute, 10*time.Minute),
 		}
 
 		userID := int64(1)
@@ -285,9 +400,13 @@ func Test_userRepo_IncrementBalance(t *testing.T) {
 			t.Fatalf("IncrementBalance() error = %v, want nil", err)
 		}
 
-		gotUser, err := r.usersByID.Get(ctx, userID)
-		if err != nil {
-			t.Fatalf("cache Get error = %v", err)
+		gotUserAny, found := r.usersByID.Get(strconv.FormatInt(userID, 10))
+		if !found {
+			t.Fatalf("cache Get miss for id=%d", userID)
+		}
+		gotUser, ok := gotUserAny.(*model.User)
+		if !ok {
+			t.Fatalf("cache Get type = %T, want *model.User", gotUserAny)
 		}
 		if gotUser.Balance != expectedBalance {
 			t.Fatalf("cache balance = %v, want %v", gotUser.Balance, expectedBalance)
@@ -313,9 +432,9 @@ func Test_userRepo_IncrementWithdrawn(t *testing.T) {
 		sqlDB := &conn.DB{DB: db}
 		r := &UserRepo{
 			repoBase:  repoBase{db: sqlDB},
-			loginToID: storage.NewMemStorage[string, int64](),
-			usersByID: storage.NewMemStorage[int64, *model.User](),
-			sessions:  storage.NewMemStorage[string, *model.Sessions](),
+			loginToID: cache.New(5*time.Minute, 10*time.Minute),
+			usersByID: cache.New(5*time.Minute, 10*time.Minute),
+			sessions:  cache.New(5*time.Minute, 10*time.Minute),
 		}
 
 		userID := int64(1)
@@ -349,9 +468,13 @@ func Test_userRepo_IncrementWithdrawn(t *testing.T) {
 			t.Fatalf("IncrementWithdrawn() error = %v, want nil", err)
 		}
 
-		gotUser, err := r.usersByID.Get(ctx, userID)
-		if err != nil {
-			t.Fatalf("cache Get error = %v", err)
+		gotUserAny, found := r.usersByID.Get(strconv.FormatInt(userID, 10))
+		if !found {
+			t.Fatalf("cache Get miss for id=%d", userID)
+		}
+		gotUser, ok := gotUserAny.(*model.User)
+		if !ok {
+			t.Fatalf("cache Get type = %T, want *model.User", gotUserAny)
 		}
 		if gotUser.Balance != expectedBalance {
 			t.Fatalf("cache balance = %v, want %v", gotUser.Balance, expectedBalance)
@@ -378,9 +501,9 @@ func Test_userRepo_UpdateLastIP(t *testing.T) {
 	sqlDB := &conn.DB{DB: db}
 	r := &UserRepo{
 		repoBase:  repoBase{db: sqlDB},
-		loginToID: storage.NewMemStorage[string, int64](),
-		usersByID: storage.NewMemStorage[int64, *model.User](),
-		sessions:  storage.NewMemStorage[string, *model.Sessions](),
+		loginToID: cache.New(5*time.Minute, 10*time.Minute),
+		usersByID: cache.New(5*time.Minute, 10*time.Minute),
+		sessions:  cache.New(5*time.Minute, 10*time.Minute),
 	}
 
 	userID := int64(1)
@@ -404,9 +527,13 @@ func Test_userRepo_UpdateLastIP(t *testing.T) {
 		t.Fatalf("UpdateLastIP() error = %v, want nil", err)
 	}
 
-	gotUser, err := r.usersByID.Get(ctx, userID)
-	if err != nil {
-		t.Fatalf("cache Get error = %v", err)
+	gotUserAny, found := r.usersByID.Get(strconv.FormatInt(userID, 10))
+	if !found {
+		t.Fatalf("cache Get miss for id=%d", userID)
+	}
+	gotUser, ok := gotUserAny.(*model.User)
+	if !ok {
+		t.Fatalf("cache Get type = %T, want *model.User", gotUserAny)
 	}
 	if gotUser.LastIP != newIP {
 		t.Fatalf("cache LastIP = %q, want %q", gotUser.LastIP, newIP)
@@ -424,13 +551,13 @@ func Test_userRepo_UserIDFromSession(t *testing.T) {
 	tokenHash := hex.EncodeToString(hash[:])
 
 	t.Run("cache_hit_valid_and_not_expired", func(t *testing.T) {
-		sessions := storage.NewMemStorage[string, *model.Sessions]()
-		_ = sessions.Set(ctx, tokenHash, &model.Sessions{
+		sessions := cache.New(5*time.Minute, 10*time.Minute)
+		sessions.Set(tokenHash, &model.Sessions{
 			UserID:    42,
 			TokenHash: tokenHash,
 			IP:        "1.2.3.4",
 			ExpiresAt: time.Now().Add(time.Hour),
-		})
+		}, cache.DefaultExpiration)
 
 		r := &UserRepo{
 			sessions: sessions,
@@ -446,13 +573,13 @@ func Test_userRepo_UserIDFromSession(t *testing.T) {
 	})
 
 	t.Run("cache_hit_expired_returns_zero_nil", func(t *testing.T) {
-		sessions := storage.NewMemStorage[string, *model.Sessions]()
-		_ = sessions.Set(ctx, tokenHash, &model.Sessions{
+		sessions := cache.New(5*time.Minute, 10*time.Minute)
+		sessions.Set(tokenHash, &model.Sessions{
 			UserID:    42,
 			TokenHash: tokenHash,
 			IP:        "1.2.3.4",
 			ExpiresAt: time.Now().Add(-time.Hour),
-		})
+		}, cache.DefaultExpiration)
 
 		r := &UserRepo{
 			sessions: sessions,

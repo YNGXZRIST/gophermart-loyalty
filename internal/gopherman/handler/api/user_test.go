@@ -39,6 +39,10 @@ func TestHandler_Login(t *testing.T) {
 		WithArgs(login).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn"}).
 			AddRow(userID, login, hash, time.Now(), time.Now(), ip, 0.0, 0.0))
+	m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByIDQuery)).
+		WithArgs(userID).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn"}).
+			AddRow(userID, login, hash, time.Now(), time.Now(), ip, 0.0, 0.0))
 	m.ExpectExec(regexp.QuoteMeta(repository.UserUpdateLastIPQuery)).
 		WithArgs(ip, userID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -84,6 +88,10 @@ func TestHandler_Register(t *testing.T) {
 		WithArgs(login, sqlmock.AnyArg(), ip).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip"}).
 			AddRow(userID, login, "hash", time.Now(), time.Now(), ip))
+	m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByIDQuery)).
+		WithArgs(userID).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn"}).
+			AddRow(userID, login, "hash", time.Now(), time.Now(), ip, 0.0, 0.0))
 	m.ExpectExec(regexp.QuoteMeta(repository.UserUpdateLastIPQuery)).
 		WithArgs(ip, userID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
