@@ -88,15 +88,7 @@ func (s *Service) AddWithdrawal(ctx context.Context, in WithdrawalInput) Withdra
 		OrderID: orderID,
 		Sum:     in.Amount,
 	}
-	err = s.TrManager.WithinTx(ctx, nil, func(ctx context.Context) error {
-		if err := s.Rep.Withdrawal.Add(ctx, withdrawal); err != nil {
-			return fmt.Errorf("add withdrawal: %w", err)
-		}
-		if err := s.Rep.User.IncrementWithdrawn(ctx, withdrawal); err != nil {
-			return fmt.Errorf("increment withdrawn: %w", err)
-		}
-		return nil
-	})
+	err = s.withdrawalWriter.MakeWithdrawal(ctx, withdrawal)
 	if err != nil {
 		return WithdrawOutput{
 			Response: Response{

@@ -9,12 +9,12 @@ import (
 	repo "gophermart-loyalty/internal/gopherman/repository"
 	repoMock "gophermart-loyalty/internal/gopherman/repository/mock"
 	"gophermart-loyalty/internal/gopherman/service"
+	"gophermart-loyalty/pkg/httpretryable"
 	"gophermart-loyalty/pkg/workerpool"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/golang/mock/gomock"
@@ -46,8 +46,10 @@ func TestClient_doAccrualRequest_OK(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	rc := httpretryable.NewRetryableClient()
+	rc.RetryMax = 1
 	c := &Client{
-		httpClient: srv.Client(),
+		httpClient: rc,
 		accrualURL: srv.URL,
 		logger:     zap.NewNop(),
 	}
@@ -106,44 +108,6 @@ func TestClient_handleSuccessResponse_DeletesInFlightAndParses(t *testing.T) {
 	}
 }
 
-func TestClient_setRetryTimeout_parsesIntAndDefaults(t *testing.T) {
-	c := &Client{}
-	before := time.Now()
-
-	sec := c.setRetryTimeout("10")
-	if sec != 10 {
-		t.Fatalf("sec = %d, want 10", sec)
-	}
-	if !c.RetryAfter.After(before) {
-		t.Fatalf("RetryAfter must be set to a future time")
-	}
-
-	sec2 := c.setRetryTimeout("not-a-number")
-	if sec2 != 1 {
-		t.Fatalf("sec2 = %d, want 1", sec2)
-	}
-}
-
-func Test_waitOrCancel_success(t *testing.T) {
-	ctx := context.Background()
-	if err := waitOrCancel(ctx, 5*time.Millisecond); err != nil {
-		t.Fatalf("waitOrCancel error = %v, want nil", err)
-	}
-}
-
-func Test_waitOrCancel_canceled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	err := waitOrCancel(ctx, 200*time.Millisecond)
-	if err == nil {
-		t.Fatalf("expected error")
-	}
-	if err != context.Canceled {
-		t.Fatalf("err = %v, want %v", err, context.Canceled)
-	}
-}
-
 func TestClient_updateOrder_registered_setsProcessing_and_incrementsBalance(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -175,14 +139,13 @@ func TestClient_updateOrder_registered_setsProcessing_and_incrementsBalance(t *t
 	}
 
 	mockOrder.EXPECT().
-		UpdateOrderAccrual(gomock.Any(), gomock.Any(), order).
+		UpdateOrderAccrual(gomock.Any(), order).
 		Return(nil)
 	mockUser.EXPECT().
-		IncrementBalance(gomock.Any(), gomock.Any(), order.UserID, accrualVal).
+		IncrementBalance(gomock.Any(), order.UserID, accrualVal).
 		Return(nil)
 
 	c := &Client{
-		db:     D,
 		ser:    service.NewService(D, repo.Repositories{User: mockUser, Order: mockOrder}),
 		mu:     sync.Mutex{},
 		logger: zap.NewNop(),

@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"fmt"
 	"gophermart-loyalty/internal/gopherman/auth/password"
 	"gophermart-loyalty/internal/gopherman/auth/session"
 	"gophermart-loyalty/internal/gopherman/constant"
@@ -207,9 +206,7 @@ func (r *userRepo) IncrementBalance(ctx context.Context, userID int64, increment
 	if err != nil {
 		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementBalance.GetByID", err)
 	}
-	fmt.Println(u.ID)
 	u.Balance += increment
-	fmt.Println(u.Balance)
 	_, err = r.repoBase.q(ctx).ExecContext(ctx,
 		userIncrementBalanceQuery,
 		u.Balance, u.ID)
