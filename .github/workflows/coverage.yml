@@ -14,6 +14,8 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     container: golang:1.26
+    env:
+      GOFLAGS: -buildvcs=false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           # cmd/statictest — отдельная утилита для statictest, тестов нет
-          go test $(go list ./... | grep -v '/cmd/statictest$') \
+          go test $$(go list ./... | grep -v '/cmd/statictest$$') \
             -coverprofile=cover.out -covermode=atomic -coverpkg=./...
           go tool cover -func=cover.out
 
