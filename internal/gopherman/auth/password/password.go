@@ -1,3 +1,4 @@
+// Package password provides password hash and verification helpers.
 package password
 
 import (
@@ -6,8 +7,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// DefaultCost is bcrypt hashing cost used by this package.
 const DefaultCost = bcrypt.DefaultCost
 
+// Hash hashes plain password using bcrypt.
 func Hash(plain string) (string, error) {
 	b, err := bcrypt.GenerateFromPassword([]byte(plain), DefaultCost)
 	if err != nil {
@@ -15,6 +18,8 @@ func Hash(plain string) (string, error) {
 	}
 	return string(b), nil
 }
+
+// Compare verifies that plain password matches bcrypt hash.
 func Compare(hash, plain string) error {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(plain))
 	if err != nil {

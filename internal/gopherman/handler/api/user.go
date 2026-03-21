@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Register handles user registration request.
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var req model.RegisterRequest
 	ctx := r.Context()
@@ -33,6 +34,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(res.Code)
 }
 
+// Login handles user authentication request.
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req model.RegisterRequest
 	ctx := r.Context()

@@ -1,3 +1,4 @@
+// Package server builds runtime application configuration.
 package server
 
 import (
@@ -10,10 +11,12 @@ const (
 	labelFlags = "FLAGS"
 )
 
+// Config is validated server configuration.
 type Config struct {
 	internal.Options
 }
 
+// NewConfig parses and validates command-line/env options.
 func NewConfig(args []string) (*Config, error) {
 	opt, err := internal.NewOptions(args)
 	if err != nil {

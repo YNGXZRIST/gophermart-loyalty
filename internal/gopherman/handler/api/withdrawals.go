@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// GetWithdrawals returns withdrawals for authenticated user.
 func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	userID, ok := contextkey.UserIDFromContext(r.Context())
 	if !ok || userID == 0 {

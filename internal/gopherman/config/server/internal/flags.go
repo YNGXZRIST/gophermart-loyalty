@@ -1,3 +1,4 @@
+// Package internal contains low-level server option parsing helpers.
 package internal
 
 import (
@@ -12,10 +13,13 @@ import (
 )
 
 const (
+	// AccrualWorkerCountDefault is default worker count for accrual polling.
 	AccrualWorkerCountDefault = 10
-	TypeModeDefault           = logger.TypeModeDevelopment
+	// TypeModeDefault is default application logging mode.
+	TypeModeDefault = logger.TypeModeDevelopment
 )
 
+// Options contains CLI/environment runtime options.
 type Options struct {
 	Address            string `env:"RUN_ADDRESS"`
 	DatabaseURL        string `env:"DATABASE_URI"`
@@ -25,6 +29,7 @@ type Options struct {
 	AccrualUseMock     bool   `env:"ACCRUAL_USE_MOCK"`
 }
 
+// NewOptions parses and normalizes runtime options from args and env.
 func NewOptions(args []string) (*Options, error) {
 	opt := new(Options)
 	if err := opt.parseArgs(args); err != nil {
@@ -80,6 +85,8 @@ func (opt *Options) parseEnv() error {
 	}
 	return nil
 }
+
+// ValidateOptions validates required runtime options.
 func (opt *Options) ValidateOptions() error {
 	if opt.Address == "" {
 		return fmt.Errorf("address is required")

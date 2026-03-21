@@ -16,6 +16,7 @@ import (
 	"github.com/patrickmn/go-cache"
 )
 
+// UserRepo provides persistence operations for users and sessions.
 type UserRepo struct {
 	repoBase  repoBase
 	loginToID *cache.Cache
@@ -27,20 +28,29 @@ type UserRepo struct {
 }
 
 const (
-	UserGetByLoginQuery    = "SELECT id, login, pass, created_at, updated_at, last_login_ip, balance, withdrawn FROM users WHERE login=$1"
-	UserGetByIDQuery       = "SELECT id, login, pass, created_at, updated_at, last_login_ip, balance, withdrawn FROM users WHERE id=$1"
-	UserRegisterQuery      = "INSERT INTO users(login, pass, last_login_ip) VALUES ($1, $2, $3) RETURNING id, login, pass, created_at, updated_at, last_login_ip"
-	UserUpdateLastIPQuery  = "UPDATE users SET last_login_ip=$1, updated_at = CURRENT_TIMESTAMP where id=$2"
+	// UserGetByLoginQuery fetches user by login.
+	UserGetByLoginQuery = "SELECT id, login, pass, created_at, updated_at, last_login_ip, balance, withdrawn FROM users WHERE login=$1"
+	// UserGetByIDQuery fetches user by id.
+	UserGetByIDQuery = "SELECT id, login, pass, created_at, updated_at, last_login_ip, balance, withdrawn FROM users WHERE id=$1"
+	// UserRegisterQuery inserts a user and returns created fields.
+	UserRegisterQuery = "INSERT INTO users(login, pass, last_login_ip) VALUES ($1, $2, $3) RETURNING id, login, pass, created_at, updated_at, last_login_ip"
+	// UserUpdateLastIPQuery updates user's last login IP.
+	UserUpdateLastIPQuery = "UPDATE users SET last_login_ip=$1, updated_at = CURRENT_TIMESTAMP where id=$2"
+	// UserUpsertSessionQuery inserts or updates session by user/IP.
 	UserUpsertSessionQuery = `INSERT INTO sessions (token_hash, user_id, expires_at, ip) VALUES ($1, $2, $3, $4)
 		 ON CONFLICT (user_id, ip) DO UPDATE SET
 		   token_hash = EXCLUDED.token_hash,
 		   expires_at = EXCLUDED.expires_at`
+	// UserUserIDFromSessionQuery resolves session token hash to user id.
 	UserUserIDFromSessionQuery = "SELECT user_id, expires_at, ip, created_at FROM sessions WHERE token_hash = $1 AND expires_at > CURRENT_TIMESTAMP"
 
+	// UserIncrementWithdrawnQuery updates balance and withdrawn totals.
 	UserIncrementWithdrawnQuery = `UPDATE users SET balance = $1,withdrawn = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`
-	UserIncrementBalanceQuery   = "UPDATE users SET balance = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;"
+	// UserIncrementBalanceQuery updates user balance by absolute value.
+	UserIncrementBalanceQuery = "UPDATE users SET balance = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;"
 )
 
+// NewUserRepository creates a user repository with in-memory caches.
 func NewUserRepository(db *conn.DB) *UserRepo {
 	loginToID := cache.New(5*time.Minute, 10*time.Minute)
 	usersByID := cache.New(5*time.Minute, 10*time.Minute)
@@ -54,6 +64,7 @@ func (r *UserRepo) setUserCache(u *model.User) {
 	r.usersByID.Set(strconv.FormatInt(u.ID, 10), u, cache.DefaultExpiration)
 }
 
+// GetByLogin returns user by login and caches the result.
 func (r *UserRepo) GetByLogin(ctx context.Context, login string) (*model.User, error) {
 	id, found := r.loginToID.Get(login)
 	if found {
@@ -67,6 +78,7 @@ func (r *UserRepo) GetByLogin(ctx context.Context, login string) (*model.User, e
 	return u, nil
 }
 
+// GetByLoginForce returns user by login bypassing local cache.
 func (r *UserRepo) GetByLoginForce(ctx context.Context, login string) (*model.User, error) {
 	var dbUser model.User
 	var lastIP sql.NullString
@@ -83,6 +95,7 @@ func (r *UserRepo) GetByLoginForce(ctx context.Context, login string) (*model.Us
 	return &dbUser, nil
 }
 
+// GetByID returns user by id and caches the result.
 func (r *UserRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
 	c, found := r.usersByID.Get(strconv.FormatInt(id, 10))
 	if found {
@@ -98,6 +111,8 @@ func (r *UserRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
 	r.setUserCache(u)
 	return u, nil
 }
+
+// GetByIDForce returns user by id bypassing local cache.
 func (r *UserRepo) GetByIDForce(ctx context.Context, id int64) (*model.User, error) {
 	var dbUser model.User
 	var lastIP sql.NullString
@@ -114,6 +129,7 @@ func (r *UserRepo) GetByIDForce(ctx context.Context, id int64) (*model.User, err
 	return &dbUser, nil
 }
 
+// Register inserts a new user and stores it in cache.
 func (r *UserRepo) Register(ctx context.Context, login, pass, ip string) (*model.User, error) {
 	hash, err := password.Hash(pass)
 	if err != nil {
@@ -134,6 +150,8 @@ func (r *UserRepo) Register(ctx context.Context, login, pass, ip string) (*model
 	r.setUserCache(&u)
 	return &u, nil
 }
+
+// UpdateLastIP updates last login IP in DB and cache.
 func (r *UserRepo) UpdateLastIP(ctx context.Context, userID int64, ip string) error {
 	u, err := r.GetByIDForce(ctx, userID)
 	if err != nil {
@@ -147,6 +165,8 @@ func (r *UserRepo) UpdateLastIP(ctx context.Context, userID int64, ip string) er
 	r.setUserCache(u)
 	return nil
 }
+
+// CreateSession creates or replaces user session token for given IP.
 func (r *UserRepo) CreateSession(ctx context.Context, userID int64, ip string) (string, error) {
 	token, err := session.GenerateToken()
 	if err != nil {
@@ -169,6 +189,7 @@ func (r *UserRepo) CreateSession(ctx context.Context, userID int64, ip string) (
 	return token, nil
 }
 
+// UserIDFromSession resolves session token to user id.
 func (r *UserRepo) UserIDFromSession(ctx context.Context, token string) (int64, error) {
 	hash := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(hash[:])
@@ -197,6 +218,8 @@ func (r *UserRepo) UserIDFromSession(ctx context.Context, token string) (int64, 
 	r.sessions.Set(tokenHash, &dbSession, cache.DefaultExpiration)
 	return dbSession.UserID, nil
 }
+
+// IncrementWithdrawn decrements balance and increments withdrawn total.
 func (r *UserRepo) IncrementWithdrawn(ctx context.Context, w *model.Withdrawal) error {
 	u, err := r.GetByIDForce(ctx, w.UserID)
 	if err != nil {
@@ -215,6 +238,8 @@ func (r *UserRepo) IncrementWithdrawn(ctx context.Context, w *model.Withdrawal) 
 	r.setUserCache(u)
 	return nil
 }
+
+// IncrementBalance increments user balance by amount.
 func (r *UserRepo) IncrementBalance(ctx context.Context, userID int64, increment float64) error {
 	if increment == 0 {
 		return nil

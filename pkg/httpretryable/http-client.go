@@ -1,3 +1,4 @@
+// Package httpretryable provides HTTP client with simple retry policy.
 package httpretryable
 
 import (
@@ -11,16 +12,20 @@ import (
 
 const defaultTimeout = 10 * time.Second
 
+// RetryableClient is HTTP client with retry and Retry-After handling.
 type RetryableClient struct {
 	RetryMax           int
 	client             *http.Client
 	rateBeforeUnixNano atomic.Int64
 }
 
+// NewRetryableClient creates retryable HTTP client.
 func NewRetryableClient() *RetryableClient {
 	client := &http.Client{}
 	return &RetryableClient{client: client}
 }
+
+// Do sends request with retry policy for retriable status codes.
 func (c *RetryableClient) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
 	n := c.rateBeforeUnixNano.Load()
 	if n > 0 {

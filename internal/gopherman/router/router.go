@@ -1,3 +1,4 @@
+// Package router builds HTTP routing for API endpoints.
 package router
 
 import (
@@ -8,6 +9,7 @@ import (
 	mChi "github.com/go-chi/chi/v5/middleware"
 )
 
+// GetRouter creates chi router with middleware and all API routes.
 func GetRouter(handler *api.Handler) *chi.Mux {
 	r := chi.NewRouter()
 	r.Group(func(r chi.Router) {

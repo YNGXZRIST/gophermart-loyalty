@@ -7,19 +7,24 @@ import (
 	"gophermart-loyalty/internal/gopherman/model"
 )
 
+// WithdrawalRepo provides persistence operations for withdrawals.
 type WithdrawalRepo struct {
 	repoBase
 }
 
 const (
-	WithdrawalAddQuery         = `INSERT INTO withdrawals (user_id, order_id, sum) VALUES ($1, $2, $3)`
+	// WithdrawalAddQuery inserts a withdrawal record.
+	WithdrawalAddQuery = `INSERT INTO withdrawals (user_id, order_id, sum) VALUES ($1, $2, $3)`
+	// WithdrawalGetByUserIDQuery lists withdrawals for a user.
 	WithdrawalGetByUserIDQuery = `SELECT order_id, sum, created_at, updated_at FROM withdrawals WHERE user_id = $1 ORDER BY created_at DESC`
 )
 
+// NewWithdrawalRepository creates a withdrawal repository bound to DB.
 func NewWithdrawalRepository(db *conn.DB) *WithdrawalRepo {
 	return &WithdrawalRepo{repoBase: repoBase{db: db}}
 }
 
+// Add persists a new withdrawal entry.
 func (r *WithdrawalRepo) Add(ctx context.Context, w *model.Withdrawal) error {
 	_, err := r.repoBase.q(ctx).ExecContext(ctx,
 		WithdrawalAddQuery,
@@ -29,6 +34,8 @@ func (r *WithdrawalRepo) Add(ctx context.Context, w *model.Withdrawal) error {
 	}
 	return nil
 }
+
+// GetByUserID returns all withdrawals for the specified user.
 func (r *WithdrawalRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Withdrawal, error) {
 	rows, err := r.repoBase.q(ctx).QueryContext(ctx,
 		WithdrawalGetByUserIDQuery,

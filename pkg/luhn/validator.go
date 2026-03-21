@@ -1,3 +1,4 @@
+// Package luhn validates identifiers using Luhn algorithm.
 package luhn
 
 import (
@@ -5,6 +6,7 @@ import (
 	"strings"
 )
 
+// Validate checks whether string passes Luhn checksum.
 func Validate(str string) bool {
 	str = strings.TrimSpace(str)
 	str = strings.ReplaceAll(str, " ", "")

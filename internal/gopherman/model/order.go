@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// Order represents loyalty order entity and API payload fields.
 type Order struct {
 	ID        int64     `json:"-"`
 	UserID    int64     `json:"-"`

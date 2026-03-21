@@ -1,8 +1,9 @@
+// Package accrual polls the external accrual service for order statuses
+// and applies accrual results to orders and user balances.
 package accrual
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"gophermart-loyalty/internal/gopherman/config/server"
 	"gophermart-loyalty/internal/gopherman/db/conn"
@@ -16,25 +17,36 @@ import (
 	"io"
 	"net/http"
 	"sync"
-	"time"
 
 	"go.uber.org/zap"
 )
 
+// Path is the relative endpoint for querying an order in the accrual service.
+// Final request URL format: <accrual base URL> + Path + <order id>.
 const Path = "/api/orders/"
 
-// accrual statuses
+// Registered means the order is accepted by the accrual service.
+//
+// The service may later transition it to Processing or a final state.
 const (
 	Registered = "REGISTERED"
+	// Processing means accrual calculation is in progress.
 	Processing = "PROCESSING"
-	Processed  = "PROCESSED"
-	Invalid    = "INVALID"
-)
-const (
-	LabelAccrual     = "ACCRUAL"
-	AccruaLoggerType = "accrual"
+	// Processed means accrual calculation is completed successfully.
+	Processed = "PROCESSED"
+	// Invalid means the order was rejected by the accrual service.
+	Invalid = "INVALID"
 )
 
+// LabelAccrual is a common error/trace label for accrual package operations.
+const (
+	LabelAccrual = "ACCRUAL"
+	// LoggerType identifies the logger configuration for accrual workers.
+	LoggerType = "accrual"
+)
+
+// Client fetches order accrual statuses from the external service,
+// deduplicates in-flight requests, and applies results via service layer.
 type Client struct {
 	ser        *service.Service
 	Pool       *workerpool.Pool
@@ -44,29 +56,20 @@ type Client struct {
 	accrualURL string
 	logger     *zap.Logger
 }
-type TaskResult struct {
-	Order           *model.Order
-	AccrualResponse *Response
-	Error           error
-}
-type Response struct {
-	Order   string   `json:"order"`
-	Status  string   `json:"status"`
-	Accrual *float64 `json:"accrual,omitempty"`
-}
 type accrualResult struct {
 	StatusCode int
 	Body       []byte
-	RetryAfter string
 }
 
+// NewClient creates an accrual client with background worker pool,
+// retryable HTTP transport, and package-scoped logger.
 func NewClient(ctx context.Context, db *conn.DB, repos repository.Repositories, cfg *server.Config) (*Client, error) {
 	newService := service.NewService(db, repos)
 	reportPool := workerpool.NewPool(cfg.AccrualWorkerCount)
 	httpClient := httpretryable.NewRetryableClient()
 	httpClient.RetryMax = 10
 	reportPool.StartBg(ctx)
-	lgr, err := logger.Initialize(cfg.Mode, AccruaLoggerType)
+	lgr, err := logger.Initialize(cfg.Mode, LoggerType)
 	if err != nil {
 		return nil, labelerrors.NewLabelError(LabelAccrual+".NewClient.Logger", err)
 	}
@@ -80,68 +83,6 @@ func NewClient(ctx context.Context, db *conn.DB, repos repository.Repositories, 
 	}, nil
 }
 
-func (c *Client) StartPoolAccrual(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			c.mu.Lock()
-			c.mu.Unlock()
-			list, err := c.ser.Rep.Order.GetOrdersPendingAccrual(ctx)
-			if err != nil {
-				c.logger.Error("Error getting orders", zap.Error(labelerrors.NewLabelError(LabelAccrual+".Client.PendingOrders", err)))
-			}
-			for _, o := range list {
-				c.mu.Lock()
-				if _, ok := c.inFlight[o.OrderID]; !ok {
-					c.inFlight[o.OrderID] = o
-					c.mu.Unlock()
-					task := workerpool.NewTask(func(x any) (any, error) {
-						order := x.(*model.Order)
-						accrual, err := c.sendRequestToAccrual(ctx, order)
-						return accrual, err
-					})
-					task.NeedResult = true
-					task.Result = o
-					c.Pool.Add(task)
-				} else {
-					c.mu.Unlock()
-				}
-			}
-		}
-	}
-}
-func (c *Client) CollectResults(ctx context.Context) {
-	resultCh := make(chan workerpool.Task, 1)
-	go func() {
-		for {
-			res := c.Pool.Get()
-			select {
-			case resultCh <- res:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case res := <-resultCh:
-			if res.Err != nil {
-				c.logger.Error("collect result income error", zap.Error(labelerrors.NewLabelError(LabelAccrual+".Client.Task", res.Err)))
-				continue
-			}
-			err := c.updateOrder(ctx, res)
-			if err != nil {
-				c.logger.Error("error updating order", zap.Error(labelerrors.NewLabelError(LabelAccrual+".Client.UpdateOrder", err)))
-			}
-		}
-	}
-}
 func (c *Client) sendRequestToAccrual(ctx context.Context, order *model.Order) (*TaskResult, error) {
 	url := c.accrualURL + Path + order.OrderID
 	select {
@@ -185,38 +126,5 @@ func (c *Client) doAccrualRequest(ctx context.Context, url string) (*accrualResu
 	return &accrualResult{
 		StatusCode: resp.StatusCode,
 		Body:       body,
-		RetryAfter: resp.Header.Get("Retry-After"),
 	}, nil
-}
-
-func (c *Client) handleSuccessResponse(body []byte, order *model.Order) (*TaskResult, error) {
-	var accResp Response
-	if err := json.Unmarshal(body, &accResp); err != nil {
-		c.removeFromInFlight(order.OrderID)
-		return nil, labelerrors.NewLabelError(LabelAccrual+".Client.handleSuccess.Unmarshal", err)
-	}
-	c.removeFromInFlight(order.OrderID)
-	return &TaskResult{
-		Order:           order,
-		AccrualResponse: &accResp,
-	}, nil
-}
-
-func (c *Client) updateOrder(ctx context.Context, taskRes workerpool.Task) error {
-	res, ok := taskRes.Result.(*TaskResult)
-	if !ok {
-		return fmt.Errorf("type assertion failed")
-	}
-	accrualResponse := res.AccrualResponse
-	order := res.Order
-	status := accrualResponse.Status
-	if status == Registered {
-		status = Processing
-	}
-	order.Status = status
-	order.Accrual = accrualResponse.Accrual
-	if err := c.ser.ApplyAccrualResult(ctx, order); err != nil {
-		return labelerrors.NewLabelError(LabelAccrual+".Client.updateOrder.Apply", err)
-	}
-	return nil
 }

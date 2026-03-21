@@ -10,23 +10,31 @@ import (
 	"strings"
 )
 
+// BalanceInput contains parameters for reading user balance.
 type BalanceInput struct {
 	UserID int64
 }
+
+// BalanceOutput contains service result and balance payload.
 type BalanceOutput struct {
 	Response
 	Balance model.BalanceResponse
 }
+
+// WithdrawalInput contains withdrawal request parameters.
 type WithdrawalInput struct {
 	UserID  int64
 	OrderID string
 	Amount  float64
 }
+
+// WithdrawOutput contains withdrawal operation result.
 type WithdrawOutput struct {
 	Response
 	Withdraw *model.Withdrawal
 }
 
+// GetBalance returns current and withdrawn amounts for user.
 func (s *Service) GetBalance(ctx context.Context, in BalanceInput) BalanceOutput {
 	user, err := s.Rep.User.GetByID(ctx, in.UserID)
 	if err != nil {
@@ -48,6 +56,7 @@ func (s *Service) GetBalance(ctx context.Context, in BalanceInput) BalanceOutput
 	}
 }
 
+// AddWithdrawal validates and stores withdrawal request.
 func (s *Service) AddWithdrawal(ctx context.Context, in WithdrawalInput) WithdrawOutput {
 	orderID := strings.TrimSpace(in.OrderID)
 	if orderID == "" {

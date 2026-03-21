@@ -14,6 +14,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// MockServer emulates external accrual API for local/testing scenarios.
 type MockServer struct {
 	Server    *http.Server
 	Addr      string
@@ -21,12 +22,14 @@ type MockServer struct {
 	ordersMap map[string]bool
 }
 
+// AvailableTypes maps pseudo-random index to mocked accrual status values.
 var AvailableTypes = map[int]string{
 	0: Invalid,
 	1: Processing,
 	2: Processed,
 }
 
+// NewMockServer starts an HTTP mock accrual server bound to cfg.AccrualAddress.
 func NewMockServer(cfg *server.Config) *MockServer {
 	u, err := url.Parse(cfg.AccrualAddress)
 	if err != nil {

@@ -59,9 +59,6 @@ func TestClient_doAccrualRequest_OK(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("StatusCode = %d, want %d", res.StatusCode, http.StatusOK)
 	}
-	if res.RetryAfter != "3" {
-		t.Fatalf("RetryAfter = %q, want %q", res.RetryAfter, "3")
-	}
 	if string(res.Body) == "" {
 		t.Fatalf("Body must be non-empty")
 	}

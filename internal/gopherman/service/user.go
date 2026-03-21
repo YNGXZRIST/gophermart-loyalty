@@ -10,24 +10,31 @@ import (
 	"net/http"
 )
 
+// RegisterInput contains payload for user registration.
 type RegisterInput struct {
 	Req model.RegisterRequest
 	IP  string
 }
+
+// RegisterOutput contains registration result and session token.
 type RegisterOutput struct {
 	Response
 	Token string
 }
+
+// LoginInput contains payload for user authentication.
 type LoginInput struct {
 	Req model.RegisterRequest
 	IP  string
 }
 
+// LoginResponse contains authentication result and session token.
 type LoginResponse struct {
 	Response
 	Token string
 }
 
+// Register creates a new user and returns a session token.
 func (s *Service) Register(ctx context.Context, in RegisterInput) RegisterOutput {
 	user, err := s.Rep.User.GetByLogin(ctx, in.Req.Login)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -70,6 +77,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) RegisterOutput
 	}
 }
 
+// Login validates credentials and returns a new session token.
 func (s *Service) Login(ctx context.Context, in LoginInput) LoginResponse {
 	user, err := s.Rep.User.GetByLogin(ctx, in.Req.Login)
 	if err != nil {

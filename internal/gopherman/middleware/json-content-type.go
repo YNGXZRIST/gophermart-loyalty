@@ -5,6 +5,7 @@ import (
 	"net/http"
 )
 
+// ContentTypeJSON enforces application/json content type for requests.
 func ContentTypeJSON(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		res := r.Header.Get(constant.ContentTypeHeader)

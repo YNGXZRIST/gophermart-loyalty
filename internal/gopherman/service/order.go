@@ -12,20 +12,24 @@ import (
 	"strings"
 )
 
+// GetOrdersInput contains parameters for listing user orders.
 type GetOrdersInput struct {
 	UserID int64
 }
 
+// GetOrdersResponse contains service result and order list.
 type GetOrdersResponse struct {
 	Response
 	Orders []*model.Order
 }
 
+// AddOrderInput contains parameters for adding an order.
 type AddOrderInput struct {
 	UserID  int64
 	OrderID string
 }
 
+// GetOrders returns orders belonging to the requested user.
 func (s *Service) GetOrders(ctx context.Context, in GetOrdersInput) GetOrdersResponse {
 	orders, err := s.Rep.Order.GetByUserID(ctx, in.UserID)
 	if err != nil {
@@ -42,6 +46,7 @@ func (s *Service) GetOrders(ctx context.Context, in GetOrdersInput) GetOrdersRes
 	}
 }
 
+// AddOrder validates and stores a new order for user.
 func (s *Service) AddOrder(ctx context.Context, in AddOrderInput) Response {
 	orderID := strings.TrimSpace(in.OrderID)
 	if orderID == "" {
@@ -75,6 +80,7 @@ func (s *Service) AddOrder(ctx context.Context, in AddOrderInput) Response {
 	return Response{Code: http.StatusAccepted}
 }
 
+// OrdersJSON encodes order list to JSON and normalizes nil slices.
 func OrdersJSON(orders []*model.Order) ([]byte, error) {
 	if orders == nil {
 		return []byte("[]"), nil

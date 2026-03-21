@@ -4,6 +4,7 @@ import (
 	"context"
 )
 
+// Pool manages workers and task/result channels.
 type Pool struct {
 	workers []*Worker
 	rCh     chan Task
@@ -12,6 +13,7 @@ type Pool struct {
 	cancel  func()
 }
 
+// NewPool creates worker pool with given capacity.
 func NewPool(c int) *Pool {
 	w := &Pool{
 		workers: make([]*Worker, 0, c),
@@ -21,6 +23,8 @@ func NewPool(c int) *Pool {
 	}
 	return w
 }
+
+// StartBg starts all workers in background.
 func (p *Pool) StartBg(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	p.cancel = cancel
@@ -31,12 +35,18 @@ func (p *Pool) StartBg(ctx context.Context) {
 	}
 
 }
+
+// Add enqueues task for processing.
 func (p *Pool) Add(task *Task) {
 	p.tCh <- *task
 }
+
+// Get blocks until processed task result is available.
 func (p *Pool) Get() Task {
 	return <-p.rCh
 }
+
+// Stop stops workers by canceling shared context.
 func (p *Pool) Stop() {
 	if p.cancel != nil {
 		p.cancel()

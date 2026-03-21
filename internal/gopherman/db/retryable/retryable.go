@@ -1,3 +1,4 @@
+// Package retryable provides retry wrappers for DB operations.
 package retryable
 
 import (
@@ -8,8 +9,11 @@ import (
 )
 
 const maxRetries = 3
+
+// RunWithRetryLabel is a label prefix for retryable errors.
 const RunWithRetryLabel = "RunWithRetry"
 
+// RunWithRetry executes operation with retry policy for retriable DB errors.
 func RunWithRetry[T any](ctx context.Context, op func() (T, error)) (T, error) {
 	var zero T
 	var lastRes T

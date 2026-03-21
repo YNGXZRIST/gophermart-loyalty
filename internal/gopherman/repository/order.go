@@ -14,22 +14,31 @@ import (
 )
 
 const (
-	OrderGetOwnerQuery                  = `SELECT user_id FROM orders WHERE order_id = $1`
-	OrderAddOrderQuery                  = `INSERT INTO orders (user_id, order_id, status) VALUES ($1, $2, 'NEW')`
-	OrderGetByUIDQuery                  = `SELECT id, order_id, status, accrual, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC`
+	// OrderGetOwnerQuery retrieves owner of an existing order.
+	OrderGetOwnerQuery = `SELECT user_id FROM orders WHERE order_id = $1`
+	// OrderAddOrderQuery inserts an order for user.
+	OrderAddOrderQuery = `INSERT INTO orders (user_id, order_id, status) VALUES ($1, $2, 'NEW')`
+	// OrderGetByUIDQuery returns orders for user sorted by creation time.
+	OrderGetByUIDQuery = `SELECT id, order_id, status, accrual, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC`
+	// OrderGetPendingOrdersWithLimitQuery returns pending orders in chunks.
 	OrderGetPendingOrdersWithLimitQuery = `SELECT id, order_id, user_id, status, created_at, updated_at FROM orders WHERE status IN ('NEW', 'PROCESSING') AND id > $1 ORDER BY id ASC LIMIT $2`
-	OrderUpdatePendingOrderQuery        = "UPDATE orders SET status = $1,accrual = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3;"
+	// OrderUpdatePendingOrderQuery updates order status and accrual.
+	OrderUpdatePendingOrderQuery = "UPDATE orders SET status = $1,accrual = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3;"
 )
 
+// ErrOrderExistsOwn is returned when user submits already owned order.
 var ErrOrderExistsOwn = errors.New("order already exists for this user")
 
+// ErrOrderExistsOther is returned when order belongs to another user.
 var ErrOrderExistsOther = errors.New("order already exists for another user")
 
+// OrderRepo provides persistence operations for orders.
 type OrderRepo struct {
 	repoBase
 	mgr *trmanager.Manager
 }
 
+// NewOrderRepository creates an order repository bound to DB.
 func NewOrderRepository(db *conn.DB) *OrderRepo {
 	return &OrderRepo{
 		repoBase: repoBase{db: db},
@@ -37,6 +46,7 @@ func NewOrderRepository(db *conn.DB) *OrderRepo {
 	}
 }
 
+// Add stores order if it does not exist for another user.
 func (r *OrderRepo) Add(ctx context.Context, userID int64, orderID string) error {
 	err := r.mgr.WithinTx(ctx, nil, func(ctx context.Context) error {
 		var ownerID sql.NullInt64
@@ -65,6 +75,7 @@ func (r *OrderRepo) Add(ctx context.Context, userID int64, orderID string) error
 	return nil
 }
 
+// GetByUserID returns all user orders.
 func (r *OrderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Order, error) {
 	var list []*model.Order
 	rows, err := r.repoBase.q(ctx).QueryContext(ctx,
@@ -96,6 +107,7 @@ func (r *OrderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Ord
 	return list, nil
 }
 
+// GetOrdersPendingAccrual returns orders that still require accrual polling.
 func (r *OrderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order, error) {
 	var lastID int64
 	const chunkSize = 1
@@ -136,6 +148,8 @@ func (r *OrderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 	}
 	return list, nil
 }
+
+// UpdateOrderAccrual updates accrual status and amount for order.
 func (r *OrderRepo) UpdateOrderAccrual(ctx context.Context, order *model.Order) error {
 
 	_, err := r.repoBase.q(ctx).ExecContext(ctx, OrderUpdatePendingOrderQuery, order.Status, order.Accrual, order.ID)

@@ -1,3 +1,4 @@
+// Package logger builds configured zap loggers for app commands.
 package logger
 
 import (
@@ -11,14 +12,19 @@ import (
 
 const logDir = "logs/"
 const (
-	TypeModeProduction  = "production"
+	// TypeModeProduction enables production logger configuration.
+	TypeModeProduction = "production"
+	// TypeModeDevelopment enables development logger configuration.
 	TypeModeDevelopment = "development"
-	TypeModeTest        = "test"
+	// TypeModeTest enables development-style logger for tests.
+	TypeModeTest = "test"
 )
 const (
+	// ServerLgr is default logger name for HTTP server command.
 	ServerLgr = "server"
 )
 
+// Initialize creates logger by mode and command type.
 func Initialize(mode, cmdType string) (*zap.Logger, error) {
 	var err error
 	var log *zap.Logger

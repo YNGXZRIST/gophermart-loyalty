@@ -1,3 +1,4 @@
+// Command gophermart starts the gophermart HTTP server.
 package main
 
 import (

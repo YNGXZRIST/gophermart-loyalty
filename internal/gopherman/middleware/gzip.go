@@ -7,11 +7,15 @@ import (
 )
 
 const (
+	// ContentEncodingHeader is request content-encoding header key.
 	ContentEncodingHeader = "Content-Encoding"
-	AcceptEncodingHeader  = "Accept-Encoding"
-	GzipEncoding          = "gzip"
+	// AcceptEncodingHeader is request accept-encoding header key.
+	AcceptEncodingHeader = "Accept-Encoding"
+	// GzipEncoding is gzip content encoding token.
+	GzipEncoding = "gzip"
 )
 
+// GzipCompressor enables gzip request/response compression when supported.
 func GzipCompressor(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ow := w

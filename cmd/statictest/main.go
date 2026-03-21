@@ -1,3 +1,4 @@
+// Command statictest runs project static analyzers.
 package main
 
 //go:generate go build -o=../../bin/statictest

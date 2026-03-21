@@ -1,3 +1,4 @@
+// Package middleware provides reusable HTTP middleware.
 package middleware
 
 import (
@@ -8,6 +9,7 @@ import (
 	"net/http"
 )
 
+// Authenticate validates bearer token and injects user ID into context.
 func Authenticate(handler *api.Handler) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

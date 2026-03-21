@@ -11,11 +11,13 @@ import (
 	"go.uber.org/zap"
 )
 
+// WithdrawalRequest is API request body for withdrawal creation.
 type WithdrawalRequest struct {
 	OrderID string  `json:"order"`
 	Amount  float64 `json:"sum"`
 }
 
+// GetBalance returns current user balance.
 func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	userID, ok := contextkey.UserIDFromContext(r.Context())
 	if !ok || userID == 0 {
@@ -40,6 +42,8 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(res.Code)
 	w.Write(bytes)
 }
+
+// MakeWithdraw creates a withdrawal for authenticated user.
 func (h *Handler) MakeWithdraw(w http.ResponseWriter, r *http.Request) {
 	userID, ok := contextkey.UserIDFromContext(r.Context())
 	if !ok || userID == 0 {

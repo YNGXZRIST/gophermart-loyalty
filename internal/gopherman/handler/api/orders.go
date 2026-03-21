@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// GetOrders returns all orders of authenticated user.
 func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	userID, ok := contextkey.UserIDFromContext(r.Context())
 	if !ok || userID == 0 {
@@ -40,6 +41,7 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// AddOrder validates and stores order for authenticated user.
 func (h *Handler) AddOrder(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {

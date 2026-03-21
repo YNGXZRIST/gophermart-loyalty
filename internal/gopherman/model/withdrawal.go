@@ -2,6 +2,7 @@ package model
 
 import "time"
 
+// Withdrawal represents user withdrawal entity and API payload fields.
 type Withdrawal struct {
 	UserID    int64     `json:"-"`
 	OrderID   string    `json:"order"`
