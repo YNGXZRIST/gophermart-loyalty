@@ -28,7 +28,10 @@ func Test_orderRepo_Add(t *testing.T) {
 	orderID := "order-1"
 
 	db, mock := newMockConnDB(t)
-	r := &orderRepo{repoBase: repoBase{db: db}}
+	r := &orderRepo{
+		repoBase: repoBase{db: db},
+		mgr:      trmanager.NewManager(db),
+	}
 	mock.MatchExpectationsInOrder(false)
 
 	mock.ExpectBegin()
@@ -151,7 +154,7 @@ func Test_orderRepo_UpdateOrderAccrual(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectRollback()
 
-	txCtx := trmanager.WithTx(ctx, &conn.Tx{Tx: txSQL})
+	txCtx := trmanager.WithTx(ctx, &trmanager.Tx{Tx: txSQL})
 	if err := r.UpdateOrderAccrual(txCtx, order); err != nil {
 		t.Fatalf("UpdateOrderAccrual() error = %v, want nil", err)
 	}

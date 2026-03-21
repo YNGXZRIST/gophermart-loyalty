@@ -6,6 +6,7 @@ import (
 	"errors"
 	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/conn"
+	"gophermart-loyalty/internal/gopherman/db/trmanager"
 	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/model"
 
@@ -34,39 +35,40 @@ type OrderRepository interface {
 
 type orderRepo struct {
 	repoBase
+	mgr *trmanager.Manager
 }
 
 func NewOrderRepository(db *conn.DB) OrderRepository {
-	return &orderRepo{repoBase: repoBase{db: db}}
+	return &orderRepo{
+		repoBase: repoBase{db: db},
+		mgr:      trmanager.NewManager(db),
+	}
 }
 
 func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.BeginTx", err)
-	}
-	defer tx.Rollback()
-	var ownerID sql.NullInt64
-	err = r.db.QueryRowContext(ctx, OrderGetOwnerQuery, orderID).Scan(&ownerID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.CheckOwner", err)
-	}
-	if ownerID.Valid {
-		if ownerID.Int64 == userID {
-			return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.ExistsOwn", ErrOrderExistsOwn)
+	err := r.mgr.WithinTx(ctx, nil, func(ctx context.Context) error {
+		var ownerID sql.NullInt64
+		err := r.repoBase.q(ctx).QueryRowContext(ctx, OrderGetOwnerQuery, orderID).Scan(&ownerID)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.CheckOwner", err)
 		}
-		return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.ExistsOther", ErrOrderExistsOther)
-	}
-	_, err = r.repoBase.q(ctx).ExecContext(ctx,
-		OrderAddOrderQuery,
-		userID, orderID)
-	if err != nil {
-		if pgErr, ok := errors.AsType[*pgconn.PgError](err); !ok || pgErr.Code != pgerrcode.UniqueViolation {
-			return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.Insert", err)
+		if ownerID.Valid {
+			if ownerID.Int64 == userID {
+				return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.ExistsOwn", ErrOrderExistsOwn)
+			}
+			return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.ExistsOther", ErrOrderExistsOther)
 		}
-	}
-	if err := tx.Commit(); err != nil {
-		return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.Commit", err)
+
+		_, err = r.repoBase.q(ctx).ExecContext(ctx, OrderAddOrderQuery, userID, orderID)
+		if err != nil {
+			if pgErr, ok := errors.AsType[*pgconn.PgError](err); !ok || pgErr.Code != pgerrcode.UniqueViolation {
+				return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.Insert", err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return labelerrors.NewLabelError(constant.LabelRepository+".Order.Add.WithinTx", err)
 	}
 	return nil
 }

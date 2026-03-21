@@ -4,33 +4,11 @@ import (
 	"context"
 	"errors"
 	"gophermart-loyalty/internal/gopherman/config/db"
+	"gophermart-loyalty/internal/gopherman/db/retryable"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
-
-func TestDB_BeginTx(t *testing.T) {
-	D, m := newMockConnDB(t)
-	ctx := context.Background()
-
-	m.ExpectBegin()
-	tx, err := D.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("BeginTx() error = %v, want nil", err)
-	}
-	if tx == nil || tx.Tx == nil {
-		t.Fatalf("BeginTx() tx = %v, want non-nil", tx)
-	}
-
-	m.ExpectRollback()
-	if err := tx.Tx.Rollback(); err != nil {
-		t.Fatalf("tx.Rollback() error = %v, want nil", err)
-	}
-
-	if err := m.ExpectationsWereMet(); err != nil {
-		t.Fatalf("sqlmock expectations not met: %v", err)
-	}
-}
 
 func TestDB_Exec(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
@@ -183,147 +161,27 @@ func TestNewConn(t *testing.T) {
 	}
 }
 
-func TestTx_ExecContext(t *testing.T) {
-	D, m := newMockConnDB(t)
-	m.MatchExpectationsInOrder(false)
-	ctx := context.Background()
-
-	m.ExpectBegin()
-	tx, err := D.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("BeginTx() error = %v", err)
-	}
-
-	query := "UPDATE users SET login=$1 WHERE id=$2"
-	m.ExpectExec(query).
-		WithArgs("bob", int64(1)).
-		WillReturnResult(sqlmock.NewResult(0, 1))
-
-	m.ExpectRollback()
-	res, err := tx.ExecContext(ctx, query, "bob", int64(1))
-	if err != nil {
-		t.Fatalf("tx.ExecContext() error = %v, want nil", err)
-	}
-	if res == nil {
-		t.Fatalf("tx.ExecContext() res = nil, want non-nil")
-	}
-
-	if err := tx.Tx.Rollback(); err != nil {
-		t.Fatalf("tx.Rollback() error = %v", err)
-	}
-
-	if err := m.ExpectationsWereMet(); err != nil {
-		t.Fatalf("sqlmock expectations not met: %v", err)
-	}
-}
-
-func TestTx_Query(t *testing.T) {
-	D, m := newMockConnDB(t)
-	m.MatchExpectationsInOrder(false)
-	ctx := context.Background()
-
-	m.ExpectBegin()
-	tx, err := D.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("BeginTx() error = %v", err)
-	}
-
-	query := "SELECT id FROM users WHERE id=$1"
-	m.ExpectQuery(query).
-		WithArgs(int64(1)).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(1)))
-
-	m.ExpectRollback()
-	rows, err := tx.Query(query, int64(1))
-	if err != nil {
-		t.Fatalf("tx.Query() error = %v, want nil", err)
-	}
-	defer rows.Close()
-
-	if !rows.Next() {
-		t.Fatalf("tx.Query() no rows, want 1 row")
-	}
-	var id int64
-	if err := rows.Scan(&id); err != nil {
-		t.Fatalf("rows.Scan() error = %v", err)
-	}
-	if id != 1 {
-		t.Fatalf("tx.Query() id = %d, want 1", id)
-	}
-
-	if err := tx.Tx.Rollback(); err != nil {
-		t.Fatalf("tx.Rollback() error = %v", err)
-	}
-
-	if err := m.ExpectationsWereMet(); err != nil {
-		t.Fatalf("sqlmock expectations not met: %v", err)
-	}
-}
-
-func TestTx_QueryContext(t *testing.T) {
-	D, m := newMockConnDB(t)
-	m.MatchExpectationsInOrder(false)
-	ctx := context.Background()
-
-	m.ExpectBegin()
-	tx, err := D.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("BeginTx() error = %v", err)
-	}
-
-	query := "SELECT login FROM users WHERE id=$1"
-	m.ExpectQuery(query).
-		WithArgs(int64(2)).
-		WillReturnRows(sqlmock.NewRows([]string{"login"}).AddRow("test"))
-
-	m.ExpectRollback()
-	rows, err := tx.QueryContext(ctx, query, int64(2))
-	if err != nil {
-		t.Fatalf("tx.QueryContext() error = %v, want nil", err)
-	}
-	defer rows.Close()
-
-	if !rows.Next() {
-		t.Fatalf("tx.QueryContext() no rows, want 1 row")
-	}
-	var login string
-	if err := rows.Scan(&login); err != nil {
-		t.Fatalf("rows.Scan() error = %v", err)
-	}
-	if login != "test" {
-		t.Fatalf("tx.QueryContext() login = %q, want %q", login, "test")
-	}
-
-	if err := tx.Tx.Rollback(); err != nil {
-		t.Fatalf("tx.Rollback() error = %v", err)
-	}
-
-	if err := m.ExpectationsWereMet(); err != nil {
-		t.Fatalf("sqlmock expectations not met: %v", err)
-	}
-}
-
-func Test_runWithRetry(t *testing.T) {
+func Test_retryable_RunWithRetry(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("non_retriable_error_wrapped", func(t *testing.T) {
-		_, err := runWithRetry[int](ctx, func() (int, error) {
+		_, err := retryable.RunWithRetry[int](ctx, func() (int, error) {
 			return 0, errors.New("boom")
 		})
 		if err == nil {
-			t.Fatalf("runWithRetry() error = nil, want non-nil")
+			t.Fatalf("RunWithRetry() error = nil, want non-nil")
 		}
 	})
 
 	t.Run("success_return_value", func(t *testing.T) {
-		got, err := runWithRetry[int](ctx, func() (int, error) {
+		got, err := retryable.RunWithRetry[int](ctx, func() (int, error) {
 			return 7, nil
 		})
 		if err != nil {
-			t.Fatalf("runWithRetry() error = %v, want nil", err)
+			t.Fatalf("RunWithRetry() error = %v, want nil", err)
 		}
 		if got != 7 {
-			t.Fatalf("runWithRetry() got = %d, want %d", got, 7)
+			t.Fatalf("RunWithRetry() got = %d, want %d", got, 7)
 		}
 	})
 }

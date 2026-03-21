@@ -25,7 +25,7 @@ func TestWithTx_TxFromContext_roundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Begin: %v", err)
 	}
-	tx := &conn.Tx{Tx: sqlTx}
+	tx := &Tx{Tx: sqlTx}
 
 	child := WithTx(ctx, tx)
 	got, ok := TxFromContext(child)
@@ -62,7 +62,7 @@ func TestResolve_returnsDBOrTx(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Begin: %v", err)
 	}
-	tx := &conn.Tx{Tx: sqlTx}
+	tx := &Tx{Tx: sqlTx}
 	txCtx := WithTx(ctx, tx)
 
 	if got := Resolve(txCtx, cdb); got != tx {
@@ -229,5 +229,5 @@ func TestQuerier_implementedByConnTypes(t *testing.T) {
 	t.Parallel()
 
 	var _ Querier = (*conn.DB)(nil)
-	var _ Querier = (*conn.Tx)(nil)
+	var _ Querier = (*Tx)(nil)
 }

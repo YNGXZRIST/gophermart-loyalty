@@ -51,7 +51,7 @@ func TestWithdrawalRepo_Add(t *testing.T) {
 
 	m.ExpectRollback()
 
-	txCtx := trmanager.WithTx(ctx, &conn.Tx{Tx: txSQL})
+	txCtx := trmanager.WithTx(ctx, &trmanager.Tx{Tx: txSQL})
 	if err := r.Add(txCtx, &model.Withdrawal{UserID: userID, OrderID: orderID, Sum: sum}); err != nil {
 		t.Fatalf("Add() error = %v, want nil", err)
 	}

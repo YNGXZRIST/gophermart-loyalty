@@ -294,7 +294,7 @@ func Test_userRepo_IncrementBalance(t *testing.T) {
 			WithArgs(expectedBalance, userID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
-		txCtx := trmanager.WithTx(ctx, &conn.Tx{Tx: txSQL})
+		txCtx := trmanager.WithTx(ctx, &trmanager.Tx{Tx: txSQL})
 		if err := r.IncrementBalance(txCtx, userID, increment); err != nil {
 			t.Fatalf("IncrementBalance() error = %v, want nil", err)
 		}
@@ -358,7 +358,7 @@ func Test_userRepo_IncrementWithdrawn(t *testing.T) {
 			WithArgs(expectedBalance, expectedWithdrawn, userID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
-		txCtx := trmanager.WithTx(ctx, &conn.Tx{Tx: txSQL})
+		txCtx := trmanager.WithTx(ctx, &trmanager.Tx{Tx: txSQL})
 		if err := r.IncrementWithdrawn(txCtx, &model.Withdrawal{UserID: userID, OrderID: "w1", Sum: sum}); err != nil {
 			t.Fatalf("IncrementWithdrawn() error = %v, want nil", err)
 		}
