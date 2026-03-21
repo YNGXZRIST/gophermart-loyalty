@@ -2,7 +2,6 @@ package api
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"encoding/json"
 	"gophermart-loyalty/internal/gopherman/auth/password"
@@ -57,7 +56,7 @@ func TestHandler_Login(t *testing.T) {
 	req.RemoteAddr = ip + ":1234"
 
 	w := httptest.NewRecorder()
-	handler.Login(w, req.WithContext(context.Background()))
+	handler.Login(w, req.WithContext(t.Context()))
 
 	if got, want := w.Code, http.StatusOK; got != want {
 		t.Fatalf("Login status code = %d, want %d", got, want)
@@ -105,7 +104,7 @@ func TestHandler_Register(t *testing.T) {
 	req.RemoteAddr = ip + ":1234"
 
 	w := httptest.NewRecorder()
-	handler.Register(w, req.WithContext(context.Background()))
+	handler.Register(w, req.WithContext(t.Context()))
 
 	if got, want := w.Code, http.StatusOK; got != want {
 		t.Fatalf("Register status code = %d, want %d", got, want)
@@ -117,7 +116,7 @@ func TestHandler_Register(t *testing.T) {
 	w2 := httptest.NewRecorder()
 	req2 := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte("not-json")))
 	req2.RemoteAddr = ip + ":1234"
-	handler.Register(w2, req2.WithContext(context.Background()))
+	handler.Register(w2, req2.WithContext(t.Context()))
 	if got, want := w2.Code, http.StatusBadRequest; got != want {
 		t.Fatalf("Register(bad json) status code = %d, want %d", got, want)
 	}

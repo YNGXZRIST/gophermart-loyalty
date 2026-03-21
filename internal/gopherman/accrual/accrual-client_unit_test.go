@@ -1,7 +1,6 @@
 package accrual
 
 import (
-	"context"
 	"encoding/json"
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/model"
@@ -52,7 +51,7 @@ func TestClient_doAccrualRequest_OK(t *testing.T) {
 		logger:     zap.NewNop(),
 	}
 
-	res, err := c.doAccrualRequest(context.Background(), srv.URL+"/api/orders/123")
+	res, err := c.doAccrualRequest(t.Context(), srv.URL+"/api/orders/123")
 	if err != nil {
 		t.Fatalf("doAccrualRequest error = %v", err)
 	}
@@ -152,7 +151,7 @@ func TestClient_updateOrder_registered_setsProcessing_and_incrementsBalance(t *t
 		logger: zap.NewNop(),
 	}
 
-	err := c.updateOrder(context.Background(), taskRes)
+	err := c.updateOrder(t.Context(), taskRes)
 	if err != nil {
 		t.Fatalf("updateOrder error = %v", err)
 	}

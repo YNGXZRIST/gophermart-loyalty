@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"context"
 	"errors"
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/db/trmanager"
@@ -13,7 +12,7 @@ import (
 )
 
 func TestAccrualWriter_ApplyResult_success_with_balance(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -57,7 +56,7 @@ func TestAccrualWriter_ApplyResult_success_with_balance(t *testing.T) {
 }
 
 func TestAccrualWriter_ApplyResult_success_nil_accrual_skips_balance(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -88,7 +87,7 @@ func TestAccrualWriter_ApplyResult_success_nil_accrual_skips_balance(t *testing.
 }
 
 func TestAccrualWriter_ApplyResult_update_fails_rollbacks(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -121,7 +120,7 @@ func TestAccrualWriter_ApplyResult_update_fails_rollbacks(t *testing.T) {
 }
 
 func TestAccrualWriter_ApplyResult_balance_fails_rollbacks(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)

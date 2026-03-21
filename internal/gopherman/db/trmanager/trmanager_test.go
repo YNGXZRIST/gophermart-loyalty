@@ -12,7 +12,7 @@ import (
 func TestWithTx_TxFromContext_roundTrip(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -51,7 +51,7 @@ func TestResolve_returnsDBOrTx(t *testing.T) {
 	t.Cleanup(func() { _ = mock.ExpectationsWereMet() })
 
 	cdb := &conn.DB{DB: db}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if got := Resolve(ctx, cdb); got != cdb {
 		t.Fatalf("Resolve without tx = %T, want *conn.DB", got)
@@ -88,7 +88,7 @@ func TestManager_WithinTx_success_commits(t *testing.T) {
 	m := NewManager(cdb)
 
 	var sawTx bool
-	err = m.WithinTx(context.Background(), nil, func(ctx context.Context) error {
+	err = m.WithinTx(t.Context(), nil, func(ctx context.Context) error {
 		_, sawTx = TxFromContext(ctx)
 		return nil
 	})
@@ -119,7 +119,7 @@ func TestManager_WithinTx_fnError_rollbacks(t *testing.T) {
 	m := NewManager(cdb)
 
 	fnErr := errors.New("fn failed")
-	err = m.WithinTx(context.Background(), nil, func(ctx context.Context) error {
+	err = m.WithinTx(t.Context(), nil, func(ctx context.Context) error {
 		return fnErr
 	})
 	if !errors.Is(err, fnErr) {
@@ -145,7 +145,7 @@ func TestManager_WithinTx_beginError(t *testing.T) {
 	cdb := &conn.DB{DB: db}
 	m := NewManager(cdb)
 
-	err = m.WithinTx(context.Background(), nil, func(ctx context.Context) error {
+	err = m.WithinTx(t.Context(), nil, func(ctx context.Context) error {
 		t.Fatal("fn must not run when BeginTx fails")
 		return nil
 	})
@@ -173,7 +173,7 @@ func TestManager_WithinTx_commitError(t *testing.T) {
 	cdb := &conn.DB{DB: db}
 	m := NewManager(cdb)
 
-	err = m.WithinTx(context.Background(), nil, func(ctx context.Context) error {
+	err = m.WithinTx(t.Context(), nil, func(ctx context.Context) error {
 		return nil
 	})
 	if !errors.Is(err, commitErr) {
@@ -195,7 +195,7 @@ func TestManager_WithoutTx(t *testing.T) {
 
 	cdb := &conn.DB{DB: db}
 	m := NewManager(cdb)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("nil_error", func(t *testing.T) {
 		calls := 0

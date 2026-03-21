@@ -1,22 +1,20 @@
 package service
 
 import (
-	"context"
 	"errors"
-	"net/http"
-	"testing"
-	"time"
-
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/model"
 	"gophermart-loyalty/internal/gopherman/repository"
+	"net/http"
+	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
 func TestService_GetOrders(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	uid := int64(100)
 	orders := []*model.Order{{OrderID: "79927398713", Status: "NEW"}}
 
@@ -92,7 +90,7 @@ func TestService_GetOrders(t *testing.T) {
 
 func TestService_AddOrder(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	uid := int64(55)
 	validOrder := "79927398713"
 

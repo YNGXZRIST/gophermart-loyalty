@@ -98,7 +98,7 @@ func TestInitHTTPHandler(t *testing.T) {
 }
 
 func TestStartHTTPServer_shutdownOnContextCancel(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	cfg := &server.Config{}
 	cfg.Address = "127.0.0.1:0"

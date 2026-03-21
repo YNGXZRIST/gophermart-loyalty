@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"context"
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/db/trmanager"
 	"gophermart-loyalty/internal/gopherman/model"
@@ -23,7 +22,7 @@ func TestNewOrderRepository(t *testing.T) {
 }
 
 func Test_orderRepo_Add(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	userID := int64(5)
 	orderID := "order-1"
 
@@ -55,7 +54,7 @@ func Test_orderRepo_Add(t *testing.T) {
 }
 
 func Test_orderRepo_GetByUserID(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	userID := int64(10)
 	db, mock := newMockConnDB(t)
 	r := &OrderRepo{repoBase: repoBase{db: db}}
@@ -86,7 +85,7 @@ func Test_orderRepo_GetByUserID(t *testing.T) {
 }
 
 func Test_orderRepo_GetOrdersPendingAccrual(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
@@ -129,7 +128,7 @@ func Test_orderRepo_GetOrdersPendingAccrual(t *testing.T) {
 }
 
 func Test_orderRepo_UpdateOrderAccrual(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {

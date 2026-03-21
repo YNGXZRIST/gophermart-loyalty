@@ -4,7 +4,6 @@
 package conn
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"gophermart-loyalty/internal/gopherman/config/db"
@@ -82,7 +81,7 @@ func getConnForMethodTests(t *testing.T) *DB {
 
 func TestDB_ExecQuery_methods(t *testing.T) {
 	conn := getConnForMethodTests(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name string

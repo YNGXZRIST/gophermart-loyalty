@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"gophermart-loyalty/internal/gopherman/auth/password"
@@ -18,7 +17,7 @@ import (
 
 func TestService_Register(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	req := model.RegisterRequest{Login: "user1", Pass: "secret12"}
 	ip := "127.0.0.1"
 
@@ -143,7 +142,7 @@ func TestService_Register(t *testing.T) {
 
 func TestService_Login(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	req := model.RegisterRequest{Login: "test", Pass: "correct"}
 	ip := "10.0.0.1"
 	hash, err := password.Hash(req.Pass)

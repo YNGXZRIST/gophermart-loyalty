@@ -19,7 +19,7 @@ func TestUserIDFromContext(t *testing.T) {
 		{
 			name: "success",
 			args: args{
-				ctx: context.WithValue(context.Background(), userIDKey, int64(1)),
+				ctx: context.WithValue(t.Context(), userIDKey, int64(1)),
 			},
 			wantUserID: 1,
 			wantOk:     true,
@@ -27,7 +27,7 @@ func TestUserIDFromContext(t *testing.T) {
 		{
 			name: "failure",
 			args: args{
-				ctx: context.Background(),
+				ctx: t.Context(),
 			},
 			wantUserID: 0,
 			wantOk:     false,
@@ -59,26 +59,26 @@ func TestWithUserID(t *testing.T) {
 		{
 			name: "success",
 			args: args{
-				ctx:    context.Background(),
+				ctx:    t.Context(),
 				userID: 1,
 			},
-			want: context.WithValue(context.Background(), userIDKey, int64(1)),
+			want: context.WithValue(t.Context(), userIDKey, int64(1)),
 		},
 		{
 			name: "zero uid",
 			args: args{
-				ctx:    context.Background(),
+				ctx:    t.Context(),
 				userID: 0,
 			},
-			want: context.WithValue(context.Background(), userIDKey, int64(0)),
+			want: context.WithValue(t.Context(), userIDKey, int64(0)),
 		},
 		{
 			name: "negative uid",
 			args: args{
-				ctx:    context.Background(),
+				ctx:    t.Context(),
 				userID: -1,
 			},
-			want: context.WithValue(context.Background(), userIDKey, int64(-1)),
+			want: context.WithValue(t.Context(), userIDKey, int64(-1)),
 		},
 	}
 	for _, tt := range tests {

@@ -47,7 +47,7 @@ type assertError struct{}
 func (assertError) Error() string { return "assertError" }
 
 func TestWorker_StartBg_WithResult(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	tCh := make(chan Task, 1)
@@ -76,7 +76,7 @@ func TestWorker_StartBg_WithResult(t *testing.T) {
 }
 
 func TestWorker_StartBg_NoResult(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	tCh := make(chan Task, 1)
@@ -107,7 +107,7 @@ func TestWorker_StartBg_NoResult(t *testing.T) {
 }
 
 func TestPool_StartBg_CreatesWorkers(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	const n = 3
@@ -125,7 +125,7 @@ func TestPool_StartBg_CreatesWorkers(t *testing.T) {
 }
 
 func TestPool_AddAndGet_TasksProcessed(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	p := NewPool(2)

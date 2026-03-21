@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"gophermart-loyalty/internal/gopherman/db/conn"
@@ -16,7 +15,7 @@ import (
 )
 
 func Test_userRepo_GetByLogin(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	login := "test"
 	userID := int64(1)
 	pass := "pass"
@@ -75,7 +74,7 @@ func Test_userRepo_GetByLogin(t *testing.T) {
 }
 
 func Test_userRepo_GetByID(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	userID := int64(42)
 	login := "bob"
 	pass := "pass"
@@ -134,7 +133,7 @@ func Test_userRepo_GetByID(t *testing.T) {
 }
 
 func Test_userRepo_GetByLoginForce(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	login := "force-login"
 	userID := int64(11)
 	pass := "pass"
@@ -177,7 +176,7 @@ func Test_userRepo_GetByLoginForce(t *testing.T) {
 }
 
 func Test_userRepo_GetByIDForce(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	userID := int64(12)
 	login := "force-id"
 	pass := "pass"
@@ -220,7 +219,7 @@ func Test_userRepo_GetByIDForce(t *testing.T) {
 }
 
 func Test_userRepo_Register(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	login := "newuser"
 	pass := "secret"
 	ip := "1.2.3.4"
@@ -288,7 +287,7 @@ func TestNewUserRepository(t *testing.T) {
 }
 
 func Test_userRepo_CreateSession(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	userID := int64(1)
 	ip := "1.2.3.4"
 
@@ -346,7 +345,7 @@ func Test_userRepo_CreateSession(t *testing.T) {
 }
 
 func Test_userRepo_IncrementBalance(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("zero_increment_no_db_calls", func(t *testing.T) {
 		r := &UserRepo{}
@@ -419,7 +418,7 @@ func Test_userRepo_IncrementBalance(t *testing.T) {
 }
 
 func Test_userRepo_IncrementWithdrawn(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("decreases_balance_and_increases_withdrawn_and_cache", func(t *testing.T) {
 		db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
@@ -490,7 +489,7 @@ func Test_userRepo_IncrementWithdrawn(t *testing.T) {
 }
 
 func Test_userRepo_UpdateLastIP(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	db, m, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
@@ -545,7 +544,7 @@ func Test_userRepo_UpdateLastIP(t *testing.T) {
 }
 
 func Test_userRepo_UserIDFromSession(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	token := "token-123"
 	hash := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(hash[:])

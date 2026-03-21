@@ -1,22 +1,20 @@
 package service
 
 import (
-	"context"
 	"errors"
-	"net/http"
-	"testing"
-	"time"
-
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/model"
 	"gophermart-loyalty/internal/gopherman/repository"
+	"net/http"
+	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
 func TestService_GetBalance(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 	uid := int64(9)
 
 	tests := []struct {

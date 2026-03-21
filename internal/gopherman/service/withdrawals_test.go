@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/repository"
 	"net/http"
@@ -11,7 +10,7 @@ import (
 )
 
 func TestService_GetWithdrawals(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	uid := int64(3)
 
 	db, m, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
@@ -41,7 +40,7 @@ func TestService_GetWithdrawals(t *testing.T) {
 
 func TestService_AddWithdrawal_Validation(t *testing.T) {
 	s := NewService(nil, repository.Repositories{})
-	out := s.AddWithdrawal(context.Background(), WithdrawalInput{UserID: 1, OrderID: "   ", Amount: 10})
+	out := s.AddWithdrawal(t.Context(), WithdrawalInput{UserID: 1, OrderID: "   ", Amount: 10})
 	if out.Code != http.StatusBadRequest {
 		t.Fatalf("Code = %d, want %d", out.Code, http.StatusBadRequest)
 	}

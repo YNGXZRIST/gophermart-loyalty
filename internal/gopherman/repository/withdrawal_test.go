@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"context"
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/db/trmanager"
 	"gophermart-loyalty/internal/gopherman/model"
@@ -23,7 +22,7 @@ func TestNewWithdrawalRepository(t *testing.T) {
 }
 
 func TestWithdrawalRepo_Add(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	db, m, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
@@ -64,7 +63,7 @@ func TestWithdrawalRepo_Add(t *testing.T) {
 }
 
 func TestWithdrawalRepo_GetByUserID(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	userID := int64(7)
 
 	db, m, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))

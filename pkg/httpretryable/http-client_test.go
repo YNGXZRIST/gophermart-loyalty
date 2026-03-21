@@ -35,7 +35,7 @@ func TestRetryableClient_Do(t *testing.T) {
 		c := NewRetryableClient()
 		c.RetryMax = 1
 		req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
-		resp, err := c.Do(context.Background(), req)
+		resp, err := c.Do(t.Context(), req)
 		if err != nil {
 			t.Fatalf("Do() error = %v", err)
 		}
@@ -61,7 +61,7 @@ func TestRetryableClient_Do(t *testing.T) {
 		c := NewRetryableClient()
 		c.RetryMax = 3
 		req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
-		resp, err := c.Do(context.Background(), req)
+		resp, err := c.Do(t.Context(), req)
 		if err != nil {
 			t.Fatalf("Do() error = %v", err)
 		}
@@ -91,7 +91,7 @@ func TestRetryableClient_Do(t *testing.T) {
 		c := NewRetryableClient()
 		c.RetryMax = 3
 		req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
-		resp, err := c.Do(context.Background(), req)
+		resp, err := c.Do(t.Context(), req)
 		if err != nil {
 			t.Fatalf("Do() error = %v", err)
 		}
@@ -113,7 +113,7 @@ func TestRetryableClient_Do(t *testing.T) {
 		c := NewRetryableClient()
 		c.RetryMax = 2
 		req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
-		resp, err := c.Do(context.Background(), req)
+		resp, err := c.Do(t.Context(), req)
 		if resp != nil && resp.Body != nil {
 			defer resp.Body.Close()
 		}
@@ -132,7 +132,7 @@ func TestRetryableClient_Do(t *testing.T) {
 		c.bumpRateBefore(time.Now().Add(200 * time.Millisecond))
 
 		req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+		ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 		defer cancel()
 
 		resp, err := c.Do(ctx, req)

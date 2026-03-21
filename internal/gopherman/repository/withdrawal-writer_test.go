@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"context"
 	"errors"
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/db/trmanager"
@@ -13,7 +12,7 @@ import (
 )
 
 func TestWithdrawalWriter_MakeWithdrawal_success(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -60,7 +59,7 @@ func TestWithdrawalWriter_MakeWithdrawal_success(t *testing.T) {
 }
 
 func TestWithdrawalWriter_MakeWithdrawal_add_fails(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -92,7 +91,7 @@ func TestWithdrawalWriter_MakeWithdrawal_add_fails(t *testing.T) {
 }
 
 func TestWithdrawalWriter_MakeWithdrawal_increment_fails(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)

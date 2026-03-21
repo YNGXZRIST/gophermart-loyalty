@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"gophermart-loyalty/internal/gopherman/db/conn"
@@ -18,7 +17,7 @@ func TestHandler_UserIDFromRequest(t *testing.T) {
 	t.Run("empty_token_after_trim", func(t *testing.T) {
 		D, _ := newMockConnDB(t)
 		handler := NewHandler(D, repository.Repositories{User: repository.NewUserRepository(D)}, zap.NewNop())
-		got, err := handler.UserIDFromRequest(context.Background(), "Bearer ")
+		got, err := handler.UserIDFromRequest(t.Context(), "Bearer ")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -39,7 +38,7 @@ func TestHandler_UserIDFromRequest(t *testing.T) {
 			WithArgs(sqlmock.AnyArg()).
 			WillReturnRows(sqlmock.NewRows([]string{"user_id", "expires_at", "ip", "created_at"}).AddRow(int64(42), time.Now().Add(time.Hour), "ip", time.Now()))
 
-		got, err := handler.UserIDFromRequest(context.Background(), "Bearer token123")
+		got, err := handler.UserIDFromRequest(t.Context(), "Bearer token123")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -63,7 +62,7 @@ func TestHandler_UserIDFromRequest(t *testing.T) {
 			WithArgs(sqlmock.AnyArg()).
 			WillReturnError(errors.New("repo error"))
 
-		_, err = handler.UserIDFromRequest(context.Background(), "Bearer bad")
+		_, err = handler.UserIDFromRequest(t.Context(), "Bearer bad")
 		if err == nil {
 			t.Fatalf("expected error, got nil")
 		}
@@ -80,7 +79,7 @@ func TestHandler_UserIDFromRequest(t *testing.T) {
 		m.ExpectQuery(repository.UserUserIDFromSessionQuery).
 			WithArgs(sqlmock.AnyArg()).
 			WillReturnError(sql.ErrNoRows)
-		_, err = handler.UserIDFromRequest(context.Background(), "Bearer bad")
+		_, err = handler.UserIDFromRequest(t.Context(), "Bearer bad")
 		if !errors.Is(err, sql.ErrNoRows) {
 			t.Fatalf("expected sql.ErrNoRows, got %v", err)
 		}

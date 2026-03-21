@@ -1,7 +1,6 @@
 package conn
 
 import (
-	"context"
 	"errors"
 	"gophermart-loyalty/internal/gopherman/config/db"
 	"gophermart-loyalty/internal/gopherman/db/retryable"
@@ -48,7 +47,7 @@ func TestDB_Exec(t *testing.T) {
 }
 
 func TestDB_ExecContext(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	t.Run("success", func(t *testing.T) {
 		D, m := newMockConnDB(t)
 		query := "UPDATE users SET balance=$1 WHERE id=$2"
@@ -117,7 +116,7 @@ func TestDB_Query(t *testing.T) {
 }
 
 func TestDB_QueryContext(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	t.Run("success", func(t *testing.T) {
 		D, m := newMockConnDB(t)
 		query := "SELECT login FROM users WHERE id=$1"
@@ -168,7 +167,7 @@ func TestNewConn(t *testing.T) {
 }
 
 func Test_retryable_RunWithRetry(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("non_retriable_error_wrapped", func(t *testing.T) {
 		_, err := retryable.RunWithRetry[int](ctx, func() (int, error) {
