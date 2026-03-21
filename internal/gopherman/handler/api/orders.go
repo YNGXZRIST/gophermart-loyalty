@@ -19,7 +19,7 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	}
 	res := h.ser.GetOrders(r.Context(), service.GetOrdersInput{UserID: userID})
 	if res.Err != nil {
-		lerr := labelerrors.NewLabelError(constant.LabelAPIHandler+".GetOrders", res.Err)
+		lerr := labelerrors.NewLabelError(labelAPIHandler+".GetOrders", res.Err)
 		h.Lgr.Info("get orders error", zap.String("error", lerr.Error()))
 		w.WriteHeader(res.Code)
 		return
@@ -30,7 +30,7 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := service.OrdersJSON(res.Orders)
 	if err != nil {
-		lerr := labelerrors.NewLabelError(constant.LabelAPIHandler+".GetOrders.Marshal", err)
+		lerr := labelerrors.NewLabelError(labelAPIHandler+".GetOrders.Marshal", err)
 		h.Lgr.Info("marshal error", zap.String("error", lerr.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -56,7 +56,7 @@ func (h *Handler) AddOrder(w http.ResponseWriter, r *http.Request) {
 		OrderID: string(body),
 	})
 	if res.Err != nil {
-		lerr := labelerrors.NewLabelError(constant.LabelAPIHandler+".AddOrder", res.Err)
+		lerr := labelerrors.NewLabelError(labelAPIHandler+".AddOrder", res.Err)
 		h.Lgr.Info("add order error", zap.String("error", lerr.Error()))
 	}
 	w.WriteHeader(res.Code)

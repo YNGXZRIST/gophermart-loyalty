@@ -22,9 +22,9 @@ type MockServer struct {
 }
 
 var AvailableTypes = map[int]string{
-	0: constant.Invalid,
-	1: constant.Processing,
-	2: constant.Processed,
+	0: Invalid,
+	1: Processing,
+	2: Processed,
 }
 
 func NewMockServer(cfg *server.Config) *MockServer {
@@ -61,13 +61,13 @@ func (c *MockServer) handleMockOrder(w http.ResponseWriter, r *http.Request) {
 	if _, ok := c.ordersMap[orderID]; !ok {
 		c.mu.Lock()
 		c.ordersMap[orderID] = true
-		resp.Status = constant.Registered
+		resp.Status = Registered
 		c.mu.Unlock()
 	} else {
 		n := rand.Intn(100) + 1
 		status := AvailableTypes[n%3]
 		resp.Status = status
-		if resp.Status == constant.Processed {
+		if resp.Status == Processed {
 			resp.Accrual = new(float64(n))
 		}
 	}

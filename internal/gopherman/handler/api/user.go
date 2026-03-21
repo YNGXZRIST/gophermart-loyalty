@@ -1,7 +1,6 @@
 package api
 
 import (
-	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/model"
 	"gophermart-loyalty/internal/gopherman/service"
@@ -25,7 +24,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		IP:  ip,
 	})
 	if res.Err != nil {
-		lerr := labelerrors.NewLabelError(constant.LabelAPIHandler+".Register", res.Err)
+		lerr := labelerrors.NewLabelError(labelAPIHandler+".Register", res.Err)
 		h.Lgr.Info("register error", zap.String("error", lerr.Error()))
 		w.WriteHeader(res.Code)
 		return
@@ -44,7 +43,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	ip := strings.Split(r.RemoteAddr, ":")[0]
 	res := h.ser.Login(ctx, service.LoginInput{Req: req, IP: ip})
 	if res.Err != nil {
-		lerr := labelerrors.NewLabelError(constant.LabelAPIHandler+".Login", res.Err)
+		lerr := labelerrors.NewLabelError(labelAPIHandler+".Login", res.Err)
 		h.Lgr.Info("login error", zap.String("error", lerr.Error()))
 		w.WriteHeader(res.Code)
 		return

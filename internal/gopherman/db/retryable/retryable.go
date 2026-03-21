@@ -2,13 +2,13 @@ package retryable
 
 import (
 	"context"
-	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/pgerrors"
 	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"time"
 )
 
 const maxRetries = 3
+const RunWithRetryLabel = "RunWithRetry"
 
 func RunWithRetry[T any](ctx context.Context, op func() (T, error)) (T, error) {
 	var zero T
@@ -22,7 +22,7 @@ func RunWithRetry[T any](ctx context.Context, op func() (T, error)) (T, error) {
 			return lastRes, nil
 		}
 		if classifier.Classify(lastErr) == pgerrors.NonRetriable {
-			return zero, labelerrors.NewLabelError(constant.PGXLabel+".RunWithRetry.NonRetriable", pgerrors.NewPgError(lastErr))
+			return zero, labelerrors.NewLabelError(RunWithRetryLabel+".NonRetriable", pgerrors.NewPgError(lastErr))
 		}
 		select {
 		case <-ctx.Done():
@@ -32,7 +32,7 @@ func RunWithRetry[T any](ctx context.Context, op func() (T, error)) (T, error) {
 		}
 	}
 	if lastErr != nil {
-		lastErr = labelerrors.NewLabelError(constant.PGXLabel+".RunWithRetry.Retried", pgerrors.NewPgError(lastErr))
+		lastErr = labelerrors.NewLabelError(RunWithRetryLabel+".Retried", pgerrors.NewPgError(lastErr))
 	}
 	return lastRes, lastErr
 }

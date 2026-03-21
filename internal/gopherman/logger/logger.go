@@ -3,7 +3,6 @@ package logger
 import (
 	"errors"
 	"fmt"
-	"gophermart-loyalty/internal/gopherman/constant"
 	"os"
 	"strings"
 
@@ -11,15 +10,23 @@ import (
 )
 
 const logDir = "logs/"
+const (
+	TypeModeProduction  = "production"
+	TypeModeDevelopment = "development"
+	TypeModeTest        = "test"
+)
+const (
+	ServerLgr = "server"
+)
 
 func Initialize(mode, cmdType string) (*zap.Logger, error) {
 	var err error
 	var log *zap.Logger
 	mode = strings.TrimSpace(mode)
 	switch mode {
-	case constant.TypeModeProduction:
+	case TypeModeProduction:
 		log, err = createProductionLogger(cmdType)
-	case constant.TypeModeDevelopment, constant.TypeModeTest:
+	case TypeModeDevelopment, TypeModeTest:
 		log, err = createDevelopmentLogger()
 	default:
 		err = errors.New("invalid mode")

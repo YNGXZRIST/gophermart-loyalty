@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"gophermart-loyalty/internal/gopherman/config/server"
-	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/logger"
@@ -23,6 +22,18 @@ import (
 )
 
 const Path = "/api/orders/"
+
+// accrual statuses
+const (
+	Registered = "REGISTERED"
+	Processing = "PROCESSING"
+	Processed  = "PROCESSED"
+	Invalid    = "INVALID"
+)
+const (
+	LabelAccrual     = "ACCRUAL"
+	AccruaLoggerType = "accrual"
+)
 
 type Client struct {
 	ser        *service.Service
@@ -55,9 +66,9 @@ func NewClient(ctx context.Context, db *conn.DB, repos repository.Repositories, 
 	httpClient := httpretryable.NewRetryableClient()
 	httpClient.RetryMax = 10
 	reportPool.StartBg(ctx)
-	lgr, err := logger.Initialize(cfg.Mode, constant.AccrualType)
+	lgr, err := logger.Initialize(cfg.Mode, AccruaLoggerType)
 	if err != nil {
-		return nil, labelerrors.NewLabelError(constant.LabelAccrual+".NewClient.Logger", err)
+		return nil, labelerrors.NewLabelError(LabelAccrual+".NewClient.Logger", err)
 	}
 	return &Client{
 		ser:        newService,
@@ -81,7 +92,7 @@ func (c *Client) StartPoolAccrual(ctx context.Context) {
 			c.mu.Unlock()
 			list, err := c.ser.Rep.Order.GetOrdersPendingAccrual(ctx)
 			if err != nil {
-				c.logger.Error("Error getting orders", zap.Error(labelerrors.NewLabelError(constant.LabelAccrual+".Client.PendingOrders", err)))
+				c.logger.Error("Error getting orders", zap.Error(labelerrors.NewLabelError(LabelAccrual+".Client.PendingOrders", err)))
 			}
 			for _, o := range list {
 				c.mu.Lock()
@@ -121,12 +132,12 @@ func (c *Client) CollectResults(ctx context.Context) {
 			return
 		case res := <-resultCh:
 			if res.Err != nil {
-				c.logger.Error("collect result income error", zap.Error(labelerrors.NewLabelError(constant.LabelAccrual+".Client.Task", res.Err)))
+				c.logger.Error("collect result income error", zap.Error(labelerrors.NewLabelError(LabelAccrual+".Client.Task", res.Err)))
 				continue
 			}
 			err := c.updateOrder(ctx, res)
 			if err != nil {
-				c.logger.Error("error updating order", zap.Error(labelerrors.NewLabelError(constant.LabelAccrual+".Client.UpdateOrder", err)))
+				c.logger.Error("error updating order", zap.Error(labelerrors.NewLabelError(LabelAccrual+".Client.UpdateOrder", err)))
 			}
 		}
 	}
@@ -136,7 +147,7 @@ func (c *Client) sendRequestToAccrual(ctx context.Context, order *model.Order) (
 	select {
 	case <-ctx.Done():
 		c.removeFromInFlight(order.OrderID)
-		return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.SendRequest.Context", ctx.Err())
+		return nil, labelerrors.NewLabelError(LabelAccrual+".Client.SendRequest.Context", ctx.Err())
 	default:
 	}
 	result, err := c.doAccrualRequest(ctx, url)
@@ -148,7 +159,7 @@ func (c *Client) sendRequestToAccrual(ctx context.Context, order *model.Order) (
 		return c.handleSuccessResponse(result.Body, order)
 	}
 	c.removeFromInFlight(order.OrderID)
-	return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.SendRequest.BadStatus", fmt.Errorf("accrual HTTP status %d", result.StatusCode))
+	return nil, labelerrors.NewLabelError(LabelAccrual+".Client.SendRequest.BadStatus", fmt.Errorf("accrual HTTP status %d", result.StatusCode))
 }
 
 func (c *Client) removeFromInFlight(orderID string) {
@@ -160,16 +171,16 @@ func (c *Client) removeFromInFlight(orderID string) {
 func (c *Client) doAccrualRequest(ctx context.Context, url string) (*accrualResult, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.doAccrualRequest.NewRequest", err)
+		return nil, labelerrors.NewLabelError(LabelAccrual+".Client.doAccrualRequest.NewRequest", err)
 	}
 	resp, err := c.httpClient.Do(ctx, req)
 	if err != nil {
-		return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.doAccrualRequest.Do", err)
+		return nil, labelerrors.NewLabelError(LabelAccrual+".Client.doAccrualRequest.Do", err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.doAccrualRequest.ReadBody", err)
+		return nil, labelerrors.NewLabelError(LabelAccrual+".Client.doAccrualRequest.ReadBody", err)
 	}
 	return &accrualResult{
 		StatusCode: resp.StatusCode,
@@ -182,7 +193,7 @@ func (c *Client) handleSuccessResponse(body []byte, order *model.Order) (*TaskRe
 	var accResp Response
 	if err := json.Unmarshal(body, &accResp); err != nil {
 		c.removeFromInFlight(order.OrderID)
-		return nil, labelerrors.NewLabelError(constant.LabelAccrual+".Client.handleSuccess.Unmarshal", err)
+		return nil, labelerrors.NewLabelError(LabelAccrual+".Client.handleSuccess.Unmarshal", err)
 	}
 	c.removeFromInFlight(order.OrderID)
 	return &TaskResult{
@@ -199,13 +210,13 @@ func (c *Client) updateOrder(ctx context.Context, taskRes workerpool.Task) error
 	accrualResponse := res.AccrualResponse
 	order := res.Order
 	status := accrualResponse.Status
-	if status == constant.Registered {
-		status = constant.Processing
+	if status == Registered {
+		status = Processing
 	}
 	order.Status = status
 	order.Accrual = accrualResponse.Accrual
 	if err := c.ser.ApplyAccrualResult(ctx, order); err != nil {
-		return labelerrors.NewLabelError(constant.LabelAccrual+".Client.updateOrder.Apply", err)
+		return labelerrors.NewLabelError(LabelAccrual+".Client.updateOrder.Apply", err)
 	}
 	return nil
 }

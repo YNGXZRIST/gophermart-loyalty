@@ -5,11 +5,15 @@ import (
 	"database/sql"
 	"fmt"
 	"gophermart-loyalty/internal/gopherman/config/db"
-	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/retryable"
 	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+)
+
+const (
+	DBLabel  = "DB"
+	PGXLabel = DBLabel + ".PGX"
 )
 
 type DB struct {
@@ -19,12 +23,12 @@ type DB struct {
 
 func NewConn(cfg *db.Config) (*DB, error) {
 	if cfg == nil || cfg.DNS == "" {
-		return nil, labelerrors.NewLabelError(constant.PGXLabel+".NewConn.DSN", fmt.Errorf("database DSN is not set"))
+		return nil, labelerrors.NewLabelError(PGXLabel+".NewConn.DSN", fmt.Errorf("database DSN is not set"))
 	}
 	dsn := cfg.DNS
 	conn, err := sql.Open("pgx", dsn)
 	if err != nil {
-		return nil, labelerrors.NewLabelError(constant.PGXLabel+".NewConn.Open", fmt.Errorf("error connecting to database: %w", err))
+		return nil, labelerrors.NewLabelError(PGXLabel+".NewConn.Open", fmt.Errorf("error connecting to database: %w", err))
 	}
 	return &DB{DB: conn, Config: cfg}, nil
 }

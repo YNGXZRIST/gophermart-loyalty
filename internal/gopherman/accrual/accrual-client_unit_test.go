@@ -3,7 +3,6 @@ package accrual
 import (
 	"context"
 	"encoding/json"
-	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/model"
 	repo "gophermart-loyalty/internal/gopherman/repository"
@@ -95,8 +94,8 @@ func TestClient_handleSuccessResponse_DeletesInFlightAndParses(t *testing.T) {
 	if got.AccrualResponse == nil {
 		t.Fatalf("AccrualResponse must not be nil")
 	}
-	if got.AccrualResponse.Status != constant.Processed {
-		t.Fatalf("status = %q, want %q", got.AccrualResponse.Status, constant.Processed)
+	if got.AccrualResponse.Status != Processed {
+		t.Fatalf("status = %q, want %q", got.AccrualResponse.Status, Processed)
 	}
 	if got.AccrualResponse.Accrual == nil || *got.AccrualResponse.Accrual != 12.5 {
 		t.Fatalf("accrual = %v, want 12.5", got.AccrualResponse.Accrual)
@@ -121,7 +120,7 @@ func TestClient_updateOrder_registered_setsProcessing_and_incrementsBalance(t *t
 	accrualVal := 55.5
 	accrualResp := Response{
 		Order:   "123",
-		Status:  constant.Registered,
+		Status:  Registered,
 		Accrual: &accrualVal,
 	}
 
@@ -134,7 +133,7 @@ func TestClient_updateOrder_registered_setsProcessing_and_incrementsBalance(t *t
 
 	mockSQL.ExpectBegin()
 	mockSQL.ExpectExec(repo.OrderUpdatePendingOrderQuery).
-		WithArgs(constant.Processing, accrualVal, order.ID).
+		WithArgs(Processing, accrualVal, order.ID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mockSQL.ExpectQuery(repo.UserGetByIDQuery).
 		WithArgs(order.UserID).
@@ -158,8 +157,8 @@ func TestClient_updateOrder_registered_setsProcessing_and_incrementsBalance(t *t
 		t.Fatalf("updateOrder error = %v", err)
 	}
 
-	if order.Status != constant.Processing {
-		t.Fatalf("order.Status = %q, want %q", order.Status, constant.Processing)
+	if order.Status != Processing {
+		t.Fatalf("order.Status = %q, want %q", order.Status, Processing)
 	}
 	if order.Accrual == nil || *order.Accrual != accrualVal {
 		t.Fatalf("order.Accrual = %v, want %v", order.Accrual, accrualVal)

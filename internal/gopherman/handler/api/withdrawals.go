@@ -18,7 +18,7 @@ func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	}
 	res := h.ser.GetWithdrawals(r.Context(), service.GetWithdrawalsInput{UserID: userID})
 	if res.Err != nil {
-		lerr := labelerrors.NewLabelError(constant.LabelAPIHandler+".GetWithdrawals", res.Err)
+		lerr := labelerrors.NewLabelError(labelAPIHandler+".GetWithdrawals", res.Err)
 		h.Lgr.Info("get orders error", zap.String("error", lerr.Error()))
 		w.WriteHeader(res.Code)
 		return
@@ -31,7 +31,7 @@ func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	bytes, err := service.WithdrawalsJSON(res.Withdrawals)
 	if err != nil {
-		lerr := labelerrors.NewLabelError(constant.LabelAPIHandler+".GetWithdrawals.Marshal", err)
+		lerr := labelerrors.NewLabelError(labelAPIHandler+".GetWithdrawals.Marshal", err)
 		h.Lgr.Info("get orders error", zap.String("error", lerr.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
 		return

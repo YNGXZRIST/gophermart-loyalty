@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/model"
@@ -26,7 +25,7 @@ func (r *WithdrawalRepo) Add(ctx context.Context, w *model.Withdrawal) error {
 		WithdrawalAddQuery,
 		w.UserID, w.OrderID, w.Sum)
 	if err != nil {
-		return labelerrors.NewLabelError(constant.LabelRepository+".Withdrawal.Add.Exec", err)
+		return labelerrors.NewLabelError(labelRepository+".Withdrawal.Add.Exec", err)
 	}
 	return nil
 }
@@ -35,7 +34,7 @@ func (r *WithdrawalRepo) GetByUserID(ctx context.Context, userID int64) ([]*mode
 		WithdrawalGetByUserIDQuery,
 		userID)
 	if err != nil {
-		return nil, labelerrors.NewLabelError(constant.LabelRepository+".Withdrawal.GetByUserID.Query", err)
+		return nil, labelerrors.NewLabelError(labelRepository+".Withdrawal.GetByUserID.Query", err)
 	}
 	defer rows.Close()
 
@@ -45,12 +44,12 @@ func (r *WithdrawalRepo) GetByUserID(ctx context.Context, userID int64) ([]*mode
 		w.UserID = userID
 		err = rows.Scan(&w.OrderID, &w.Sum, &w.CreatedAt, &w.UpdatedAt)
 		if err != nil {
-			return nil, labelerrors.NewLabelError(constant.LabelRepository+".Withdrawal.GetByUserID.Scan", err)
+			return nil, labelerrors.NewLabelError(labelRepository+".Withdrawal.GetByUserID.Scan", err)
 		}
 		list = append(list, new(w))
 	}
 	if err := rows.Err(); err != nil {
-		return nil, labelerrors.NewLabelError(constant.LabelRepository+".Withdrawal.GetByUserID.Rows", err)
+		return nil, labelerrors.NewLabelError(labelRepository+".Withdrawal.GetByUserID.Rows", err)
 	}
 	return list, nil
 }

@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"gophermart-loyalty/internal/gopherman/auth/password"
 	"gophermart-loyalty/internal/gopherman/auth/session"
-	"gophermart-loyalty/internal/gopherman/constant"
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/errors/labelerrors"
 	"gophermart-loyalty/internal/gopherman/model"
@@ -56,7 +55,7 @@ func (r *UserRepo) GetByLogin(ctx context.Context, login string) (*model.User, e
 		login,
 	).Scan(&dbUser.ID, &dbUser.Login, &dbUser.Pass, &dbUser.CreatedAt, &dbUser.UpdatedAt, &lastIP, &dbUser.Balance, &dbUser.Withdrawn)
 	if err != nil {
-		return nil, labelerrors.NewLabelError(constant.LabelRepository+".User.GetByLogin.Query", err)
+		return nil, labelerrors.NewLabelError(labelRepository+".User.GetByLogin.Query", err)
 	}
 	if lastIP.Valid {
 		dbUser.LastIP = lastIP.String
@@ -78,7 +77,7 @@ func (r *UserRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
 		id,
 	).Scan(&dbUser.ID, &dbUser.Login, &dbUser.Pass, &dbUser.CreatedAt, &dbUser.UpdatedAt, &lastIP, &dbUser.Balance, &dbUser.Withdrawn)
 	if err != nil {
-		return nil, labelerrors.NewLabelError(constant.LabelRepository+".User.GetByID.Query", err)
+		return nil, labelerrors.NewLabelError(labelRepository+".User.GetByID.Query", err)
 	}
 	if lastIP.Valid {
 		dbUser.LastIP = lastIP.String
@@ -91,7 +90,7 @@ func (r *UserRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
 func (r *UserRepo) Register(ctx context.Context, login, pass, ip string) (*model.User, error) {
 	hash, err := password.Hash(pass)
 	if err != nil {
-		return nil, labelerrors.NewLabelError(constant.LabelRepository+".User.Register.HashPassword", err)
+		return nil, labelerrors.NewLabelError(labelRepository+".User.Register.HashPassword", err)
 	}
 	var u model.User
 	var lastIP sql.NullString
@@ -100,7 +99,7 @@ func (r *UserRepo) Register(ctx context.Context, login, pass, ip string) (*model
 		login, hash, ip,
 	).Scan(&u.ID, &u.Login, &u.Pass, &u.CreatedAt, &u.UpdatedAt, &lastIP)
 	if err != nil {
-		return nil, labelerrors.NewLabelError(constant.LabelRepository+".User.Register.Insert", err)
+		return nil, labelerrors.NewLabelError(labelRepository+".User.Register.Insert", err)
 	}
 	if lastIP.Valid {
 		u.LastIP = lastIP.String
@@ -112,11 +111,11 @@ func (r *UserRepo) Register(ctx context.Context, login, pass, ip string) (*model
 func (r *UserRepo) UpdateLastIP(ctx context.Context, userID int64, ip string) error {
 	u, err := r.GetByID(ctx, userID)
 	if err != nil {
-		return labelerrors.NewLabelError(constant.LabelRepository+".User.UpdateLastIP.GetByID", err)
+		return labelerrors.NewLabelError(labelRepository+".User.UpdateLastIP.GetByID", err)
 	}
 	_, err = r.repoBase.q(ctx).ExecContext(ctx, UserUpdateLastIPQuery, ip, userID)
 	if err != nil {
-		return labelerrors.NewLabelError(constant.LabelRepository+".User.UpdateLastIP.Exec", err)
+		return labelerrors.NewLabelError(labelRepository+".User.UpdateLastIP.Exec", err)
 	}
 	u.LastIP = ip
 	return nil
@@ -124,7 +123,7 @@ func (r *UserRepo) UpdateLastIP(ctx context.Context, userID int64, ip string) er
 func (r *UserRepo) CreateSession(ctx context.Context, userID int64, ip string) (string, error) {
 	token, err := session.GenerateToken()
 	if err != nil {
-		return "", labelerrors.NewLabelError(constant.LabelRepository+".User.CreateSession.GenerateToken", err)
+		return "", labelerrors.NewLabelError(labelRepository+".User.CreateSession.GenerateToken", err)
 	}
 	hash := sha256.Sum256([]byte(token))
 	tokenHash := hex.EncodeToString(hash[:])
@@ -137,7 +136,7 @@ func (r *UserRepo) CreateSession(ctx context.Context, userID int64, ip string) (
 		UserUpsertSessionQuery,
 		tokenHash, userID, expiresAt, ip)
 	if err != nil {
-		return "", labelerrors.NewLabelError(constant.LabelRepository+".User.CreateSession.Upsert", err)
+		return "", labelerrors.NewLabelError(labelRepository+".User.CreateSession.Upsert", err)
 	}
 	_ = r.sessions.Set(ctx, tokenHash, &model.Sessions{UserID: userID, TokenHash: tokenHash, ExpiresAt: expiresAt, IP: ip})
 	return token, nil
@@ -159,7 +158,7 @@ func (r *UserRepo) UserIDFromSession(ctx context.Context, token string) (int64, 
 		UserUserIDFromSessionQuery,
 		tokenHash).Scan(&dbSession.UserID, &dbSession.ExpiresAt, &ipNull, &dbSession.CreatedAt)
 	if err != nil {
-		return 0, labelerrors.NewLabelError(constant.LabelRepository+".User.UserIDFromSession.Query", err)
+		return 0, labelerrors.NewLabelError(labelRepository+".User.UserIDFromSession.Query", err)
 	}
 	if ipNull.Valid {
 		dbSession.IP = ipNull.String
@@ -179,11 +178,11 @@ func (r *UserRepo) IncrementWithdrawn(ctx context.Context, w *model.Withdrawal) 
 		UserIncrementWithdrawnQuery,
 		u.Balance, u.Withdrawn, u.ID)
 	if err != nil {
-		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementWithdrawn.Exec", err)
+		return labelerrors.NewLabelError(labelRepository+".User.IncrementWithdrawn.Exec", err)
 	}
 	err = r.usersByID.Set(ctx, u.ID, u)
 	if err != nil {
-		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementWithdrawn.Cache", err)
+		return labelerrors.NewLabelError(labelRepository+".User.IncrementWithdrawn.Cache", err)
 	}
 
 	return nil
@@ -194,18 +193,18 @@ func (r *UserRepo) IncrementBalance(ctx context.Context, userID int64, increment
 	}
 	u, err := r.GetByID(ctx, userID)
 	if err != nil {
-		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementBalance.GetByID", err)
+		return labelerrors.NewLabelError(labelRepository+".User.IncrementBalance.GetByID", err)
 	}
 	u.Balance += increment
 	_, err = r.repoBase.q(ctx).ExecContext(ctx,
 		UserIncrementBalanceQuery,
 		u.Balance, u.ID)
 	if err != nil {
-		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementBalance.Exec", err)
+		return labelerrors.NewLabelError(labelRepository+".User.IncrementBalance.Exec", err)
 	}
 	err = r.usersByID.Set(ctx, u.ID, u)
 	if err != nil {
-		return labelerrors.NewLabelError(constant.LabelRepository+".User.IncrementBalance.Cache", err)
+		return labelerrors.NewLabelError(labelRepository+".User.IncrementBalance.Cache", err)
 	}
 	return nil
 

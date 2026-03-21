@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"gophermart-loyalty/internal/gopherman/config/server"
-	"gophermart-loyalty/internal/gopherman/constant"
+	"gophermart-loyalty/internal/gopherman/logger"
 	"testing"
 	"time"
 
@@ -62,7 +62,7 @@ func TestInitConfig_missingAccrualAddress(t *testing.T) {
 
 func TestInitLogger_validMode(t *testing.T) {
 	cfg := &server.Config{}
-	cfg.Mode = constant.TypeModeTest
+	cfg.Mode = logger.TypeModeTest
 	lgr, err := initLogger(cfg)
 	if err != nil {
 		t.Fatal(err)

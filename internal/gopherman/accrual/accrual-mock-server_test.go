@@ -2,7 +2,7 @@ package accrual
 
 import (
 	"encoding/json"
-	"gophermart-loyalty/internal/gopherman/constant"
+	cnst "gophermart-loyalty/internal/gopherman/constant"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -30,8 +30,8 @@ func TestMockServer_handleMockOrder(t *testing.T) {
 		if got, want := rr.Code, http.StatusOK; got != want {
 			t.Fatalf("status code = %d, want %d", got, want)
 		}
-		if ct := rr.Header().Get(constant.ContentTypeHeader); ct != constant.ApplicationJSON {
-			t.Fatalf("content-type = %q, want %q", ct, constant.ApplicationJSON)
+		if ct := rr.Header().Get(cnst.ContentTypeHeader); ct != cnst.ApplicationJSON {
+			t.Fatalf("content-type = %q, want %q", ct, cnst.ApplicationJSON)
 		}
 
 		var resp Response
@@ -41,8 +41,8 @@ func TestMockServer_handleMockOrder(t *testing.T) {
 		if resp.Order != "123" {
 			t.Fatalf("resp.Order = %q, want %q", resp.Order, "123")
 		}
-		if resp.Status != constant.Registered {
-			t.Fatalf("resp.Status = %q, want %q", resp.Status, constant.Registered)
+		if resp.Status != Registered {
+			t.Fatalf("resp.Status = %q, want %q", resp.Status, Registered)
 		}
 		if resp.Accrual != nil {
 			t.Fatalf("resp.Accrual must be nil for registered status")
@@ -70,10 +70,10 @@ func TestMockServer_handleMockOrder(t *testing.T) {
 			t.Fatalf("unmarshal second response: %v", err)
 		}
 
-		if resp.Status == constant.Registered {
-			t.Fatalf("second resp.Status must not be %q", constant.Registered)
+		if resp.Status == Registered {
+			t.Fatalf("second resp.Status must not be %q", Registered)
 		}
-		if resp.Status == constant.Processed && resp.Accrual == nil {
+		if resp.Status == Processed && resp.Accrual == nil {
 			t.Fatalf("processed status must have non-nil accrual")
 		}
 

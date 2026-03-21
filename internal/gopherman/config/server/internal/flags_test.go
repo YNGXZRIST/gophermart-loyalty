@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"gophermart-loyalty/internal/gopherman/constant"
 	"reflect"
 	"testing"
 )
@@ -126,8 +125,8 @@ func Test_parseArgs(t *testing.T) {
 			Address:            addr,
 			DatabaseURL:        dbURL,
 			AccrualAddress:     accrual,
-			Mode:               constant.TypeModeDefault,
-			AccrualWorkerCount: constant.AccrualWorkerCountDefault,
+			Mode:               TypeModeDefault,
+			AccrualWorkerCount: AccrualWorkerCountDefault,
 		}
 	}
 	tests := []struct {
