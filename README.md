@@ -1,8 +1,8 @@
 # gophermart-loyalty
 
-[![gophermart](https://img.shields.io/github/actions/workflow/status/YNGXZRIST/gophermart-loyalty/gophermart.yml?label=gophermart&logo=github)](https://github.com/YNGXZRIST/gophermart-loyalty/actions/workflows/gophermart.yml)
-[![go vet test](https://img.shields.io/github/actions/workflow/status/YNGXZRIST/gophermart-loyalty/statictest.yml?label=go%20vet%20test&logo=github)](https://github.com/YNGXZRIST/gophermart-loyalty/actions/workflows/statictest.yml)
-[![coverage](https://img.shields.io/github/actions/workflow/status/YNGXZRIST/gophermart-loyalty/coverage.yml?label=coverage&logo=github)](https://github.com/YNGXZRIST/gophermart-loyalty/actions/workflows/coverage.yml)
+[![gophermart](https://img.shields.io/github/actions/workflow/status/YNGXZRIST/gophermart-loyalty/gophermart.yml?branch=iter1&label=gophermart&logo=github)](https://github.com/YNGXZRIST/gophermart-loyalty/actions/workflows/gophermart.yml?query=branch%3Aiter1)
+[![go vet test](https://img.shields.io/github/actions/workflow/status/YNGXZRIST/gophermart-loyalty/statictest.yml?branch=iter1&label=go%20vet%20test&logo=github)](https://github.com/YNGXZRIST/gophermart-loyalty/actions/workflows/statictest.yml?query=branch%3Aiter1)
+[![coverage](https://img.shields.io/github/actions/workflow/status/YNGXZRIST/gophermart-loyalty/coverage.yml?branch=iter1&label=coverage&logo=github)](https://github.com/YNGXZRIST/gophermart-loyalty/actions/workflows/coverage.yml?query=branch%3Aiter1)
 [![coverage %](.badges/coverage.svg)](https://github.com/YNGXZRIST/gophermart-loyalty/actions/workflows/coverage.yml)
 
 Сервис лояльности Gophermart на Go.
