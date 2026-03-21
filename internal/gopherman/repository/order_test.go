@@ -17,8 +17,8 @@ func TestNewOrderRepository(t *testing.T) {
 	if got == nil {
 		t.Fatalf("NewUserRepository returned nil")
 	}
-	if _, ok := got.(*orderRepo); !ok {
-		t.Fatalf("NewUserRepository() type = %T, want *userRepo", got)
+	if _, ok := any(got).(*OrderRepo); !ok {
+		t.Fatalf("NewOrderRepository() type = %T, want *OrderRepo", got)
 	}
 }
 
@@ -28,7 +28,7 @@ func Test_orderRepo_Add(t *testing.T) {
 	orderID := "order-1"
 
 	db, mock := newMockConnDB(t)
-	r := &orderRepo{
+	r := &OrderRepo{
 		repoBase: repoBase{db: db},
 		mgr:      trmanager.NewManager(db),
 	}
@@ -58,14 +58,14 @@ func Test_orderRepo_GetByUserID(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(10)
 	db, mock := newMockConnDB(t)
-	r := &orderRepo{repoBase: repoBase{db: db}}
+	r := &OrderRepo{repoBase: repoBase{db: db}}
 	mock.MatchExpectationsInOrder(false)
 
 	createdAt := time.Now().Add(-time.Hour)
 	updatedAt := time.Now().Add(-time.Minute)
 	accrual := 1.23
 
-	mock.ExpectQuery(OrderGetByUidQuery).
+	mock.ExpectQuery(OrderGetByUIDQuery).
 		WithArgs(userID).
 		WillReturnRows(
 			sqlmock.NewRows([]string{"id", "order_id", "status", "accrual", "created_at", "updated_at"}).
@@ -96,7 +96,7 @@ func Test_orderRepo_GetOrdersPendingAccrual(t *testing.T) {
 	mock.MatchExpectationsInOrder(false)
 
 	sqlDB := &conn.DB{DB: db}
-	r := &orderRepo{repoBase: repoBase{db: sqlDB}}
+	r := &OrderRepo{repoBase: repoBase{db: sqlDB}}
 
 	createdAt := time.Now().Add(-time.Minute)
 	updatedAt := time.Now().Add(-time.Second)
@@ -138,7 +138,7 @@ func Test_orderRepo_UpdateOrderAccrual(t *testing.T) {
 	defer db.Close()
 
 	sqlDB := &conn.DB{DB: db}
-	r := &orderRepo{repoBase: repoBase{db: sqlDB}}
+	r := &OrderRepo{repoBase: repoBase{db: sqlDB}}
 
 	var accrual = 12.34
 	order := &model.Order{ID: 1, Status: "PROCESSING", Accrual: &accrual}

@@ -13,7 +13,7 @@ func (b *repoBase) q(ctx context.Context) trmanager.Querier {
 }
 
 type Repositories struct {
-	User       UserRepository
-	Order      OrderRepository
-	Withdrawal WithdrawalRepository
+	User       *UserRepo
+	Order      *OrderRepo
+	Withdrawal *WithdrawalRepo
 }

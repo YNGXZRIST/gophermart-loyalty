@@ -4,14 +4,15 @@ import (
 	"database/sql"
 	"errors"
 	"gophermart-loyalty/internal/gopherman/contextkey"
+	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/handler/api"
 	"gophermart-loyalty/internal/gopherman/repository"
-	"gophermart-loyalty/internal/gopherman/repository/mock"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
-	"github.com/golang/mock/gomock"
+	"github.com/DATA-DOG/go-sqlmock"
 	"go.uber.org/zap"
 )
 
@@ -21,7 +22,7 @@ func TestAuthenticate(t *testing.T) {
 	tests := []struct {
 		name           string
 		authHeader     string
-		setupMock      func(u *mock.MockUserRepository)
+		setupMock      func(m sqlmock.Sqlmock, rawToken string)
 		wantCode       int
 		wantUserID     int64
 		wantNextCalled bool
@@ -29,22 +30,27 @@ func TestAuthenticate(t *testing.T) {
 		{
 			name:           "no Authorization header",
 			authHeader:     "",
-			setupMock:      func(u *mock.MockUserRepository) {},
+			setupMock:      func(m sqlmock.Sqlmock, rawToken string) {},
 			wantCode:       http.StatusUnauthorized,
 			wantNextCalled: false,
 		},
 		{
 			name:           "Bearer without token (empty after trim)",
 			authHeader:     "Bearer ",
-			setupMock:      func(u *mock.MockUserRepository) {},
+			setupMock:      func(m sqlmock.Sqlmock, rawToken string) {},
 			wantCode:       http.StatusUnauthorized,
 			wantNextCalled: false,
 		},
 		{
 			name:       "valid Bearer token",
 			authHeader: "Bearer session-abc",
-			setupMock: func(u *mock.MockUserRepository) {
-				u.EXPECT().UserIDFromSession(gomock.Any(), "session-abc").Return(int64(42), nil)
+			setupMock: func(m sqlmock.Sqlmock, rawToken string) {
+				m.ExpectQuery(repository.UserUserIDFromSessionQuery).
+					WithArgs(sqlmock.AnyArg()).
+					WillReturnRows(
+						sqlmock.NewRows([]string{"user_id", "expires_at", "ip", "created_at"}).
+							AddRow(int64(42), time.Now().Add(time.Hour), "1.2.3.4", time.Now()),
+					)
 			},
 			wantCode:       http.StatusOK,
 			wantUserID:     42,
@@ -53,8 +59,13 @@ func TestAuthenticate(t *testing.T) {
 		{
 			name:       "token without Bearer prefix",
 			authHeader: "raw-token",
-			setupMock: func(u *mock.MockUserRepository) {
-				u.EXPECT().UserIDFromSession(gomock.Any(), "raw-token").Return(int64(7), nil)
+			setupMock: func(m sqlmock.Sqlmock, rawToken string) {
+				m.ExpectQuery(repository.UserUserIDFromSessionQuery).
+					WithArgs(sqlmock.AnyArg()).
+					WillReturnRows(
+						sqlmock.NewRows([]string{"user_id", "expires_at", "ip", "created_at"}).
+							AddRow(int64(7), time.Now().Add(time.Hour), "1.2.3.4", time.Now()),
+					)
 			},
 			wantCode:       http.StatusOK,
 			wantUserID:     7,
@@ -63,8 +74,10 @@ func TestAuthenticate(t *testing.T) {
 		{
 			name:       "session not found (sql.ErrNoRows)",
 			authHeader: "Bearer unknown",
-			setupMock: func(u *mock.MockUserRepository) {
-				u.EXPECT().UserIDFromSession(gomock.Any(), "unknown").Return(int64(0), sql.ErrNoRows)
+			setupMock: func(m sqlmock.Sqlmock, rawToken string) {
+				m.ExpectQuery(repository.UserUserIDFromSessionQuery).
+					WithArgs(sqlmock.AnyArg()).
+					WillReturnError(sql.ErrNoRows)
 			},
 			wantCode:       http.StatusUnauthorized,
 			wantNextCalled: false,
@@ -72,8 +85,10 @@ func TestAuthenticate(t *testing.T) {
 		{
 			name:       "repository error",
 			authHeader: "Bearer x",
-			setupMock: func(u *mock.MockUserRepository) {
-				u.EXPECT().UserIDFromSession(gomock.Any(), "x").Return(int64(0), errors.New("db error"))
+			setupMock: func(m sqlmock.Sqlmock, rawToken string) {
+				m.ExpectQuery(repository.UserUserIDFromSessionQuery).
+					WithArgs(sqlmock.AnyArg()).
+					WillReturnError(errors.New("db error"))
 			},
 			wantCode:       http.StatusInternalServerError,
 			wantNextCalled: false,
@@ -81,8 +96,13 @@ func TestAuthenticate(t *testing.T) {
 		{
 			name:       "user id 0 with nil error",
 			authHeader: "Bearer expired",
-			setupMock: func(u *mock.MockUserRepository) {
-				u.EXPECT().UserIDFromSession(gomock.Any(), "expired").Return(int64(0), nil)
+			setupMock: func(m sqlmock.Sqlmock, rawToken string) {
+				m.ExpectQuery(repository.UserUserIDFromSessionQuery).
+					WithArgs(sqlmock.AnyArg()).
+					WillReturnRows(
+						sqlmock.NewRows([]string{"user_id", "expires_at", "ip", "created_at"}).
+							AddRow(int64(0), time.Now().Add(time.Hour), "1.2.3.4", time.Now()),
+					)
 			},
 			wantCode:       http.StatusUnauthorized,
 			wantNextCalled: false,
@@ -92,12 +112,14 @@ func TestAuthenticate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			db, m, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			if err != nil {
+				t.Fatalf("sqlmock.New: %v", err)
+			}
+			defer db.Close()
 
-			userRep := mock.NewMockUserRepository(ctrl)
-			tt.setupMock(userRep)
-
+			userRep := repository.NewUserRepository(&conn.DB{DB: db})
+			tt.setupMock(m, tt.authHeader)
 			handler := api.NewHandler(nil, repository.Repositories{User: userRep}, zap.NewNop())
 
 			var nextCalled bool
@@ -128,6 +150,9 @@ func TestAuthenticate(t *testing.T) {
 			}
 			if tt.wantNextCalled && gotUserID != tt.wantUserID {
 				t.Errorf("context userID = %d, want %d", gotUserID, tt.wantUserID)
+			}
+			if err := m.ExpectationsWereMet(); err != nil {
+				t.Errorf("sqlmock expectations not met: %v", err)
 			}
 		})
 	}

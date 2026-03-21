@@ -6,41 +6,47 @@ import (
 	"database/sql"
 	"encoding/json"
 	"gophermart-loyalty/internal/gopherman/auth/password"
+	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/model"
 	"gophermart-loyalty/internal/gopherman/repository"
-	"gophermart-loyalty/internal/gopherman/repository/mock"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"testing"
+	"time"
 
-	"github.com/golang/mock/gomock"
+	"github.com/DATA-DOG/go-sqlmock"
 	"go.uber.org/zap"
 )
 
 func TestHandler_Login(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	userID := int64(10)
 	login := "test"
 	ip := "127.0.0.1"
-	token := "tokenABC"
 
 	hash, err := password.Hash("correct-pass")
 	if err != nil {
 		t.Fatalf("password.Hash() error: %v", err)
 	}
 
-	mockUser := mock.NewMockUserRepository(ctrl)
-	mockUser.EXPECT().
-		GetByLogin(gomock.Any(), login).
-		Return(&model.User{ID: userID, Login: login, Pass: hash}, nil)
-	mockUser.EXPECT().
-		CreateSession(gomock.Any(), userID, ip).
-		Return(token, nil)
+	db, m, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+	D := &conn.DB{DB: db}
+	m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByLoginQuery)).
+		WithArgs(login).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn"}).
+			AddRow(userID, login, hash, time.Now(), time.Now(), ip, 0.0, 0.0))
+	m.ExpectExec(regexp.QuoteMeta(repository.UserUpdateLastIPQuery)).
+		WithArgs(ip, userID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	m.ExpectExec(regexp.QuoteMeta(repository.UserUpsertSessionQuery)).
+		WithArgs(sqlmock.AnyArg(), userID, sqlmock.AnyArg(), ip).
+		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	D, _ := newMockConnDB(t)
-	handler := NewHandler(D, repository.Repositories{User: mockUser}, zap.NewNop())
+	handler := NewHandler(D, repository.Repositories{User: repository.NewUserRepository(D)}, zap.NewNop())
 
 	reqBody, _ := json.Marshal(model.RegisterRequest{Login: login, Pass: "correct-pass"})
 	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(reqBody))
@@ -52,33 +58,39 @@ func TestHandler_Login(t *testing.T) {
 	if got, want := w.Code, http.StatusOK; got != want {
 		t.Fatalf("Login status code = %d, want %d", got, want)
 	}
-	if got, want := w.Header().Get("Authorization"), "Bearer "+token; got != want {
-		t.Fatalf("Authorization header = %q, want %q", got, want)
+	if got := w.Header().Get("Authorization"); got == "" {
+		t.Fatal("Authorization header is empty")
+	}
+	if err := m.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations not met: %v", err)
 	}
 }
 
 func TestHandler_Register(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	userID := int64(7)
 	login := "test2"
 	ip := "127.0.0.1"
-	token := "tokenABC"
 
-	mockUser := mock.NewMockUserRepository(ctrl)
-	mockUser.EXPECT().
-		GetByLogin(gomock.Any(), login).
-		Return(nil, sql.ErrNoRows)
-	mockUser.EXPECT().
-		Register(gomock.Any(), login, "secret-pass", ip).
-		Return(&model.User{ID: userID, Login: login}, nil)
-	mockUser.EXPECT().
-		CreateSession(gomock.Any(), userID, ip).
-		Return(token, nil)
-
-	D, _ := newMockConnDB(t)
-	handler := NewHandler(D, repository.Repositories{User: mockUser}, zap.NewNop())
+	db, m, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+	D := &conn.DB{DB: db}
+	m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByLoginQuery)).
+		WithArgs(login).
+		WillReturnError(sql.ErrNoRows)
+	m.ExpectQuery(regexp.QuoteMeta(repository.UserRegisterQuery)).
+		WithArgs(login, sqlmock.AnyArg(), ip).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip"}).
+			AddRow(userID, login, "hash", time.Now(), time.Now(), ip))
+	m.ExpectExec(regexp.QuoteMeta(repository.UserUpdateLastIPQuery)).
+		WithArgs(ip, userID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	m.ExpectExec(regexp.QuoteMeta(repository.UserUpsertSessionQuery)).
+		WithArgs(sqlmock.AnyArg(), userID, sqlmock.AnyArg(), ip).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	handler := NewHandler(D, repository.Repositories{User: repository.NewUserRepository(D)}, zap.NewNop())
 
 	reqBody, _ := json.Marshal(model.RegisterRequest{Login: login, Pass: "secret-pass"})
 	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(reqBody))
@@ -90,8 +102,8 @@ func TestHandler_Register(t *testing.T) {
 	if got, want := w.Code, http.StatusOK; got != want {
 		t.Fatalf("Register status code = %d, want %d", got, want)
 	}
-	if got, want := w.Header().Get("Authorization"), "Bearer "+token; got != want {
-		t.Fatalf("Authorization header = %q, want %q", got, want)
+	if got := w.Header().Get("Authorization"); got == "" {
+		t.Fatal("Authorization header is empty")
 	}
 
 	w2 := httptest.NewRecorder()
@@ -100,5 +112,8 @@ func TestHandler_Register(t *testing.T) {
 	handler.Register(w2, req2.WithContext(context.Background()))
 	if got, want := w2.Code, http.StatusBadRequest; got != want {
 		t.Fatalf("Register(bad json) status code = %d, want %d", got, want)
+	}
+	if err := m.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations not met: %v", err)
 	}
 }

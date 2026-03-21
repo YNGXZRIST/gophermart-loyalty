@@ -7,7 +7,6 @@ import (
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/model"
 	repo "gophermart-loyalty/internal/gopherman/repository"
-	repoMock "gophermart-loyalty/internal/gopherman/repository/mock"
 	"gophermart-loyalty/internal/gopherman/service"
 	"gophermart-loyalty/pkg/httpretryable"
 	"gophermart-loyalty/pkg/workerpool"
@@ -15,9 +14,9 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/golang/mock/gomock"
 	"go.uber.org/zap"
 )
 
@@ -109,14 +108,9 @@ func TestClient_handleSuccessResponse_DeletesInFlightAndParses(t *testing.T) {
 }
 
 func TestClient_updateOrder_registered_setsProcessing_and_incrementsBalance(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockOrder := repoMock.NewMockOrderRepository(ctrl)
-	mockUser := repoMock.NewMockUserRepository(ctrl)
 	D, mockSQL := newMockConnDBForAccrual(t)
-	mockSQL.ExpectBegin()
-	mockSQL.ExpectCommit()
+	orderRepo := repo.NewOrderRepository(D)
+	userRepo := repo.NewUserRepository(D)
 
 	order := &model.Order{
 		ID:      1,
@@ -138,15 +132,23 @@ func TestClient_updateOrder_registered_setsProcessing_and_incrementsBalance(t *t
 		},
 	}
 
-	mockOrder.EXPECT().
-		UpdateOrderAccrual(gomock.Any(), order).
-		Return(nil)
-	mockUser.EXPECT().
-		IncrementBalance(gomock.Any(), order.UserID, accrualVal).
-		Return(nil)
+	mockSQL.ExpectBegin()
+	mockSQL.ExpectExec(repo.OrderUpdatePendingOrderQuery).
+		WithArgs(constant.Processing, accrualVal, order.ID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mockSQL.ExpectQuery(repo.UserGetByIDQuery).
+		WithArgs(order.UserID).
+		WillReturnRows(
+			sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn"}).
+				AddRow(order.UserID, "test", "pass", time.Now().Add(-time.Hour), time.Now(), "old-ip", 100.0, 20.0),
+		)
+	mockSQL.ExpectExec(repo.UserIncrementBalanceQuery).
+		WithArgs(155.5, order.UserID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mockSQL.ExpectCommit()
 
 	c := &Client{
-		ser:    service.NewService(D, repo.Repositories{User: mockUser, Order: mockOrder}),
+		ser:    service.NewService(D, repo.Repositories{User: userRepo, Order: orderRepo}),
 		mu:     sync.Mutex{},
 		logger: zap.NewNop(),
 	}

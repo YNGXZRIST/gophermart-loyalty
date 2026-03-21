@@ -113,7 +113,11 @@ func TestRetryableClient_Do(t *testing.T) {
 		c := NewRetryableClient()
 		c.RetryMax = 2
 		req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
-		_, err := c.Do(context.Background(), req)
+		resp, err := c.Do(context.Background(), req)
+		if resp != nil && resp.Body != nil {
+			defer resp.Body.Close()
+		}
+
 		if err == nil {
 			t.Fatal("Do() error = nil, want error")
 		}
@@ -131,7 +135,10 @@ func TestRetryableClient_Do(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 		defer cancel()
 
-		_, err := c.Do(ctx, req)
+		resp, err := c.Do(ctx, req)
+		if resp != nil && resp.Body != nil {
+			defer resp.Body.Close()
+		}
 		if err == nil {
 			t.Fatal("Do() error = nil, want context timeout error")
 		}

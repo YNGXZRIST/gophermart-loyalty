@@ -128,7 +128,7 @@ func TestHandler_MakeWithdraw(t *testing.T) {
 		mockSQL.ExpectBegin()
 
 		mockSQL.ExpectExec(
-			"INSERT INTO withdrawals (user_id, order_id, sum) VALUES ($1, $2, $3)",
+			repository.WithdrawalAddQuery,
 		).
 			WithArgs(userID, orderID, amount).
 			WillReturnResult(sqlmock.NewResult(1, 1))
@@ -136,7 +136,7 @@ func TestHandler_MakeWithdraw(t *testing.T) {
 		updatedBalance := initialBalance - amount
 		updatedWithdrawn := initialWithdrawn + amount
 		mockSQL.ExpectExec(
-			"UPDATE users SET balance = $1,withdrawn = $2  WHERE id = $3",
+			repository.UserIncrementWithdrawnQuery,
 		).
 			WithArgs(updatedBalance, updatedWithdrawn, userID).
 			WillReturnResult(sqlmock.NewResult(1, 1))

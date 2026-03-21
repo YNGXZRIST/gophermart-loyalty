@@ -7,26 +7,12 @@ import (
 	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/db/trmanager"
 	"gophermart-loyalty/internal/gopherman/model"
-	"gophermart-loyalty/internal/gopherman/repository/mock"
 	"gophermart-loyalty/pkg/storage"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/golang/mock/gomock"
 )
-
-func TestUserRepository_WithMocks(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockUser := mock.NewMockUserRepository(ctrl)
-
-	repos := Repositories{
-		User: mockUser,
-	}
-	_ = repos
-}
 
 func Test_userRepo_GetByLogin(t *testing.T) {
 	ctx := context.Background()
@@ -38,13 +24,13 @@ func Test_userRepo_GetByLogin(t *testing.T) {
 	withdrawn := 10.5
 
 	db, mockSQL := newMockConnDB(t)
-	r := NewUserRepository(db).(*userRepo)
+	r := NewUserRepository(db)
 	mockSQL.MatchExpectationsInOrder(false)
 
 	createdAt := time.Now().Add(-time.Hour)
 	updatedAt := time.Now().Add(-time.Minute)
 
-	mockSQL.ExpectQuery(userGetByLoginQuery).
+	mockSQL.ExpectQuery(UserGetByLoginQuery).
 		WithArgs(login).
 		WillReturnRows(
 			sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn"}).
@@ -89,7 +75,7 @@ func Test_userRepo_GetByID(t *testing.T) {
 	withdrawn := 35.5
 
 	db, mockSQL := newMockConnDB(t)
-	r := NewUserRepository(db).(*userRepo)
+	r := NewUserRepository(db)
 	mockSQL.MatchExpectationsInOrder(false)
 
 	createdAt := time.Now().Add(-time.Hour)
@@ -138,13 +124,13 @@ func Test_userRepo_Register(t *testing.T) {
 	userID := int64(3)
 
 	db, mockSQL := newMockConnDB(t)
-	r := NewUserRepository(db).(*userRepo)
+	r := NewUserRepository(db)
 	mockSQL.MatchExpectationsInOrder(false)
 
 	createdAt := time.Now().Add(-time.Hour)
 	updatedAt := time.Now().Add(-time.Minute)
 
-	mockSQL.ExpectQuery(userRegisterQuery).
+	mockSQL.ExpectQuery(UserRegisterQuery).
 		WithArgs(login, sqlmock.AnyArg(), ip).
 		WillReturnRows(
 			sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip"}).
@@ -185,8 +171,8 @@ func TestNewUserRepository(t *testing.T) {
 	if got == nil {
 		t.Fatalf("NewUserRepository returned nil")
 	}
-	if _, ok := got.(*userRepo); !ok {
-		t.Fatalf("NewUserRepository() type = %T, want *userRepo", got)
+	if _, ok := any(got).(*UserRepo); !ok {
+		t.Fatalf("NewUserRepository() type = %T, want *UserRepo", got)
 	}
 }
 
@@ -196,7 +182,7 @@ func Test_userRepo_CreateSession(t *testing.T) {
 	ip := "1.2.3.4"
 
 	db, mockSQL := newMockConnDB(t)
-	r := NewUserRepository(db).(*userRepo)
+	r := NewUserRepository(db)
 	mockSQL.MatchExpectationsInOrder(false)
 
 	createdAt := time.Now().Add(-time.Hour)
@@ -209,11 +195,11 @@ func Test_userRepo_CreateSession(t *testing.T) {
 				AddRow(userID, "test", "pass", createdAt, updatedAt, "old-ip", 0.0, 0.0),
 		)
 
-	mockSQL.ExpectExec(userUpdateLastIPQuery).
+	mockSQL.ExpectExec(UserUpdateLastIPQuery).
 		WithArgs(ip, userID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
-	mockSQL.ExpectExec(userUpsertSessionQuery).
+	mockSQL.ExpectExec(UserUpsertSessionQuery).
 		WithArgs(sqlmock.AnyArg(), userID, sqlmock.AnyArg(), ip).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -248,7 +234,7 @@ func Test_userRepo_IncrementBalance(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("zero_increment_no_db_calls", func(t *testing.T) {
-		r := &userRepo{}
+		r := &UserRepo{}
 		if err := r.IncrementBalance(ctx, 123, 0); err != nil {
 			t.Fatalf("IncrementBalance() error = %v, want nil", err)
 		}
@@ -263,7 +249,7 @@ func Test_userRepo_IncrementBalance(t *testing.T) {
 		defer db.Close()
 
 		sqlDB := &conn.DB{DB: db}
-		r := &userRepo{
+		r := &UserRepo{
 			repoBase:  repoBase{db: sqlDB},
 			loginToID: storage.NewMemStorage[string, int64](),
 			usersByID: storage.NewMemStorage[int64, *model.User](),
@@ -290,7 +276,7 @@ func Test_userRepo_IncrementBalance(t *testing.T) {
 		}
 		defer func() { _ = txSQL.Rollback() }()
 
-		mock.ExpectExec(userIncrementBalanceQuery).
+		mock.ExpectExec(UserIncrementBalanceQuery).
 			WithArgs(expectedBalance, userID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -325,7 +311,7 @@ func Test_userRepo_IncrementWithdrawn(t *testing.T) {
 		defer db.Close()
 
 		sqlDB := &conn.DB{DB: db}
-		r := &userRepo{
+		r := &UserRepo{
 			repoBase:  repoBase{db: sqlDB},
 			loginToID: storage.NewMemStorage[string, int64](),
 			usersByID: storage.NewMemStorage[int64, *model.User](),
@@ -354,7 +340,7 @@ func Test_userRepo_IncrementWithdrawn(t *testing.T) {
 		}
 		defer func() { _ = txSQL.Rollback() }()
 
-		mock.ExpectExec(userIncrementWithdrawnQuery).
+		mock.ExpectExec(UserIncrementWithdrawnQuery).
 			WithArgs(expectedBalance, expectedWithdrawn, userID).
 			WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -390,7 +376,7 @@ func Test_userRepo_UpdateLastIP(t *testing.T) {
 	defer db.Close()
 
 	sqlDB := &conn.DB{DB: db}
-	r := &userRepo{
+	r := &UserRepo{
 		repoBase:  repoBase{db: sqlDB},
 		loginToID: storage.NewMemStorage[string, int64](),
 		usersByID: storage.NewMemStorage[int64, *model.User](),
@@ -410,7 +396,7 @@ func Test_userRepo_UpdateLastIP(t *testing.T) {
 			"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn",
 		}).AddRow(userID, "test", "pass", createdAt, updatedAt, "old-ip", initialBalance, initialWithdrawn))
 
-	m.ExpectExec(userUpdateLastIPQuery).
+	m.ExpectExec(UserUpdateLastIPQuery).
 		WithArgs(newIP, userID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -446,7 +432,7 @@ func Test_userRepo_UserIDFromSession(t *testing.T) {
 			ExpiresAt: time.Now().Add(time.Hour),
 		})
 
-		r := &userRepo{
+		r := &UserRepo{
 			sessions: sessions,
 		}
 
@@ -468,7 +454,7 @@ func Test_userRepo_UserIDFromSession(t *testing.T) {
 			ExpiresAt: time.Now().Add(-time.Hour),
 		})
 
-		r := &userRepo{
+		r := &UserRepo{
 			sessions: sessions,
 		}
 

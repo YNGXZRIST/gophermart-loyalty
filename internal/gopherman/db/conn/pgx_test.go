@@ -108,6 +108,9 @@ func TestDB_Query(t *testing.T) {
 	if id != 1 {
 		t.Fatalf("Query() id = %d, want 1", id)
 	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("rows.Err() error = %v", err)
+	}
 	if err := m.ExpectationsWereMet(); err != nil {
 		t.Fatalf("sqlmock expectations not met: %v", err)
 	}
@@ -137,6 +140,9 @@ func TestDB_QueryContext(t *testing.T) {
 		}
 		if login != "test" {
 			t.Fatalf("QueryContext() login = %q, want %q", login, "test")
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatalf("rows.Err() error = %v", err)
 		}
 		if err := m.ExpectationsWereMet(); err != nil {
 			t.Fatalf("sqlmock expectations not met: %v", err)

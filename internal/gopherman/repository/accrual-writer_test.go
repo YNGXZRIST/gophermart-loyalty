@@ -22,8 +22,8 @@ func TestAccrualWriter_ApplyResult_success_with_balance(t *testing.T) {
 	mock.MatchExpectationsInOrder(false)
 
 	sqlDB := &conn.DB{DB: db}
-	orderRepo := NewOrderRepository(sqlDB).(*orderRepo)
-	userRepo := NewUserRepository(sqlDB).(*userRepo)
+	orderRepo := NewOrderRepository(sqlDB)
+	userRepo := NewUserRepository(sqlDB)
 	repos := Repositories{Order: orderRepo, User: userRepo}
 	w := NewAccrualWriter(trmanager.NewManager(sqlDB), repos)
 
@@ -43,7 +43,7 @@ func TestAccrualWriter_ApplyResult_success_with_balance(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn",
 		}).AddRow(userID, "test", "pass", createdAt, updatedAt, "old-ip", initialBalance, 20.0))
-	mock.ExpectExec(userIncrementBalanceQuery).
+	mock.ExpectExec(UserIncrementBalanceQuery).
 		WithArgs(initialBalance+accrual, userID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
@@ -66,8 +66,8 @@ func TestAccrualWriter_ApplyResult_success_nil_accrual_skips_balance(t *testing.
 	mock.MatchExpectationsInOrder(false)
 
 	sqlDB := &conn.DB{DB: db}
-	orderRepo := NewOrderRepository(sqlDB).(*orderRepo)
-	userRepo := NewUserRepository(sqlDB).(*userRepo)
+	orderRepo := NewOrderRepository(sqlDB)
+	userRepo := NewUserRepository(sqlDB)
 	repos := Repositories{Order: orderRepo, User: userRepo}
 	w := NewAccrualWriter(trmanager.NewManager(sqlDB), repos)
 
@@ -97,8 +97,8 @@ func TestAccrualWriter_ApplyResult_update_fails_rollbacks(t *testing.T) {
 	mock.MatchExpectationsInOrder(false)
 
 	sqlDB := &conn.DB{DB: db}
-	orderRepo := NewOrderRepository(sqlDB).(*orderRepo)
-	userRepo := NewUserRepository(sqlDB).(*userRepo)
+	orderRepo := NewOrderRepository(sqlDB)
+	userRepo := NewUserRepository(sqlDB)
 	repos := Repositories{Order: orderRepo, User: userRepo}
 	w := NewAccrualWriter(trmanager.NewManager(sqlDB), repos)
 
@@ -130,8 +130,8 @@ func TestAccrualWriter_ApplyResult_balance_fails_rollbacks(t *testing.T) {
 	mock.MatchExpectationsInOrder(false)
 
 	sqlDB := &conn.DB{DB: db}
-	orderRepo := NewOrderRepository(sqlDB).(*orderRepo)
-	userRepo := NewUserRepository(sqlDB).(*userRepo)
+	orderRepo := NewOrderRepository(sqlDB)
+	userRepo := NewUserRepository(sqlDB)
 	repos := Repositories{Order: orderRepo, User: userRepo}
 	w := NewAccrualWriter(trmanager.NewManager(sqlDB), repos)
 
@@ -151,7 +151,7 @@ func TestAccrualWriter_ApplyResult_balance_fails_rollbacks(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn",
 		}).AddRow(userID, "test", "pass", createdAt, updatedAt, "old-ip", 100.0, 0.0))
-	mock.ExpectExec(userIncrementBalanceQuery).
+	mock.ExpectExec(UserIncrementBalanceQuery).
 		WithArgs(100.0+accrual, userID).
 		WillReturnError(dbErr)
 	mock.ExpectRollback()

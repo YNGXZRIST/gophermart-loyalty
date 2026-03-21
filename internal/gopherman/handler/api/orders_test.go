@@ -235,7 +235,7 @@ func TestHandler_GetOrders(t *testing.T) {
 		accrual := 12.34
 
 		D, mockSQL := newMockConnDB(t)
-		mockSQL.ExpectQuery(repository.OrderGetByUidQuery).
+		mockSQL.ExpectQuery(repository.OrderGetByUIDQuery).
 			WithArgs(userID).
 			WillReturnRows(sqlmock.NewRows([]string{
 				"id", "order_id", "status", "accrual", "created_at", "updated_at",
@@ -268,7 +268,7 @@ func TestHandler_GetOrders(t *testing.T) {
 			t.Fatalf("unmarshal response: %v", err)
 		}
 		if len(resp) != 2 {
-			t.Fatalf("orders len = %d, want 2; body=%s", len(resp), string(w.Body.Bytes()))
+			t.Fatalf("orders len = %d, want 2; body=%s", len(resp), w.Body.String())
 		}
 		if resp[0].OrderID != "79927398713" || resp[0].Status != "NEW" {
 			t.Fatalf("order[0] = %+v, want number=79927398713 status=NEW", resp[0])
@@ -292,7 +292,7 @@ func TestHandler_GetOrders(t *testing.T) {
 		userID := int64(55)
 
 		D, mockSQL := newMockConnDB(t)
-		mockSQL.ExpectQuery(repository.OrderGetByUidQuery).
+		mockSQL.ExpectQuery(repository.OrderGetByUIDQuery).
 			WithArgs(userID).
 			WillReturnRows(sqlmock.NewRows([]string{
 				"id", "order_id", "status", "accrual", "created_at", "updated_at",
@@ -344,7 +344,7 @@ func TestHandler_GetOrders(t *testing.T) {
 		userID := int64(55)
 
 		D, mockSQL := newMockConnDB(t)
-		mockSQL.ExpectQuery(repository.OrderGetByUidQuery).
+		mockSQL.ExpectQuery(repository.OrderGetByUIDQuery).
 			WithArgs(userID).
 			WillReturnError(errors.New("db error"))
 

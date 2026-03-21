@@ -24,7 +24,7 @@ func TestHandler_GetWithdrawals(t *testing.T) {
 
 		D, mockSQL := newMockConnDB(t)
 		mockSQL.ExpectQuery(
-			"SELECT order_id, sum, created_at, updated_at FROM withdrawals WHERE user_id = $1 ORDER BY created_at DESC",
+			repository.WithdrawalGetByUserIDQuery,
 		).
 			WithArgs(userID).
 			WillReturnRows(sqlmock.NewRows([]string{"order_id", "sum", "created_at", "updated_at"}).
@@ -68,7 +68,7 @@ func TestHandler_GetWithdrawals(t *testing.T) {
 		D, mockSQL := newMockConnDB(t)
 
 		mockSQL.ExpectQuery(
-			"SELECT order_id, sum, created_at, updated_at FROM withdrawals WHERE user_id = $1 ORDER BY created_at DESC",
+			repository.WithdrawalGetByUserIDQuery,
 		).
 			WithArgs(userID).
 			WillReturnRows(sqlmock.NewRows([]string{"order_id", "sum", "created_at", "updated_at"}))
@@ -120,7 +120,7 @@ func TestHandler_GetWithdrawals(t *testing.T) {
 		D, mockSQL := newMockConnDB(t)
 
 		mockSQL.ExpectQuery(
-			"SELECT order_id, sum, created_at, updated_at FROM withdrawals WHERE user_id = $1 ORDER BY created_at DESC",
+			repository.WithdrawalGetByUserIDQuery,
 		).
 			WithArgs(userID).
 			WillReturnError(errors.New("db error"))

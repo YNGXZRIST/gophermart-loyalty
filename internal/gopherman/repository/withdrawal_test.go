@@ -45,7 +45,7 @@ func TestWithdrawalRepo_Add(t *testing.T) {
 		t.Fatalf("db.Begin: %v", err)
 	}
 
-	m.ExpectExec(withdrawalAddQuery).
+	m.ExpectExec(WithdrawalAddQuery).
 		WithArgs(userID, orderID, sum).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -80,7 +80,7 @@ func TestWithdrawalRepo_GetByUserID(t *testing.T) {
 	createdAt := time.Now().Add(-time.Hour)
 	updatedAt := time.Now()
 
-	m.ExpectQuery(withdrawalGetByUserIDQuery).
+	m.ExpectQuery(WithdrawalGetByUserIDQuery).
 		WithArgs(userID).
 		WillReturnRows(
 			sqlmock.NewRows([]string{"order_id", "sum", "created_at", "updated_at"}).

@@ -22,7 +22,7 @@ func TestWithdrawalWriter_MakeWithdrawal_success(t *testing.T) {
 	mock.MatchExpectationsInOrder(false)
 
 	sqlDB := &conn.DB{DB: db}
-	userRepo := NewUserRepository(sqlDB).(*userRepo)
+	userRepo := NewUserRepository(sqlDB)
 	wdRepo := NewWithdrawalRepository(sqlDB)
 	repos := Repositories{User: userRepo, Withdrawal: wdRepo}
 	w := NewWithdrawalWriter(trmanager.NewManager(sqlDB), repos)
@@ -38,7 +38,7 @@ func TestWithdrawalWriter_MakeWithdrawal_success(t *testing.T) {
 	wd := &model.Withdrawal{UserID: userID, OrderID: "w1", Sum: sum}
 
 	mock.ExpectBegin()
-	mock.ExpectExec(withdrawalAddQuery).
+	mock.ExpectExec(WithdrawalAddQuery).
 		WithArgs(userID, wd.OrderID, sum).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectQuery(UserGetByIDQuery).
@@ -46,7 +46,7 @@ func TestWithdrawalWriter_MakeWithdrawal_success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn",
 		}).AddRow(userID, "test", "pass", createdAt, updatedAt, "old-ip", initialBalance, initialWithdrawn))
-	mock.ExpectExec(userIncrementWithdrawnQuery).
+	mock.ExpectExec(UserIncrementWithdrawnQuery).
 		WithArgs(expectedBalance, expectedWithdrawn, userID).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
@@ -69,7 +69,7 @@ func TestWithdrawalWriter_MakeWithdrawal_add_fails(t *testing.T) {
 	mock.MatchExpectationsInOrder(false)
 
 	sqlDB := &conn.DB{DB: db}
-	userRepo := NewUserRepository(sqlDB).(*userRepo)
+	userRepo := NewUserRepository(sqlDB)
 	wdRepo := NewWithdrawalRepository(sqlDB)
 	repos := Repositories{User: userRepo, Withdrawal: wdRepo}
 	w := NewWithdrawalWriter(trmanager.NewManager(sqlDB), repos)
@@ -78,7 +78,7 @@ func TestWithdrawalWriter_MakeWithdrawal_add_fails(t *testing.T) {
 	dbErr := errors.New("insert failed")
 
 	mock.ExpectBegin()
-	mock.ExpectExec(withdrawalAddQuery).
+	mock.ExpectExec(WithdrawalAddQuery).
 		WithArgs(wd.UserID, wd.OrderID, wd.Sum).
 		WillReturnError(dbErr)
 	mock.ExpectRollback()
@@ -101,7 +101,7 @@ func TestWithdrawalWriter_MakeWithdrawal_increment_fails(t *testing.T) {
 	mock.MatchExpectationsInOrder(false)
 
 	sqlDB := &conn.DB{DB: db}
-	userRepo := NewUserRepository(sqlDB).(*userRepo)
+	userRepo := NewUserRepository(sqlDB)
 	wdRepo := NewWithdrawalRepository(sqlDB)
 	repos := Repositories{User: userRepo, Withdrawal: wdRepo}
 	w := NewWithdrawalWriter(trmanager.NewManager(sqlDB), repos)
@@ -114,7 +114,7 @@ func TestWithdrawalWriter_MakeWithdrawal_increment_fails(t *testing.T) {
 	dbErr := errors.New("update user failed")
 
 	mock.ExpectBegin()
-	mock.ExpectExec(withdrawalAddQuery).
+	mock.ExpectExec(WithdrawalAddQuery).
 		WithArgs(userID, wd.OrderID, sum).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectQuery(UserGetByIDQuery).
@@ -122,7 +122,7 @@ func TestWithdrawalWriter_MakeWithdrawal_increment_fails(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn",
 		}).AddRow(userID, "test", "pass", createdAt, updatedAt, "old-ip", 100.0, 10.0))
-	mock.ExpectExec(userIncrementWithdrawnQuery).
+	mock.ExpectExec(UserIncrementWithdrawnQuery).
 		WithArgs(100.0-sum, 10.0+sum, userID).
 		WillReturnError(dbErr)
 	mock.ExpectRollback()

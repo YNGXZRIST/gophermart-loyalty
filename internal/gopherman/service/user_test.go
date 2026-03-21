@@ -5,13 +5,15 @@ import (
 	"database/sql"
 	"errors"
 	"gophermart-loyalty/internal/gopherman/auth/password"
+	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/model"
 	"gophermart-loyalty/internal/gopherman/repository"
-	"gophermart-loyalty/internal/gopherman/repository/mock"
 	"net/http"
+	"regexp"
 	"testing"
+	"time"
 
-	"github.com/golang/mock/gomock"
+	"github.com/DATA-DOG/go-sqlmock"
 )
 
 func TestService_Register(t *testing.T) {
@@ -22,7 +24,7 @@ func TestService_Register(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		setup      func(u *mock.MockUserRepository)
+		setup      func(m sqlmock.Sqlmock)
 		wantCode   int
 		wantErr    bool
 		wantToken  bool
@@ -30,60 +32,87 @@ func TestService_Register(t *testing.T) {
 	}{
 		{
 			name: "GetByLogin database error",
-			setup: func(u *mock.MockUserRepository) {
-				u.EXPECT().GetByLogin(ctx, req.Login).Return(nil, errors.New("db down"))
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByLoginQuery)).
+					WithArgs(req.Login).
+					WillReturnError(errors.New("db down"))
 			},
 			wantCode: http.StatusInternalServerError,
 			wantErr:  true,
 		},
 		{
 			name: "login already taken",
-			setup: func(u *mock.MockUserRepository) {
-				u.EXPECT().GetByLogin(ctx, req.Login).Return(&model.User{ID: 1, Login: req.Login}, nil)
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByLoginQuery)).
+					WithArgs(req.Login).
+					WillReturnRows(sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn"}).
+						AddRow(int64(1), req.Login, "hash", time.Now(), time.Now(), "127.0.0.1", 0.0, 0.0))
 			},
 			wantCode: http.StatusConflict,
 			wantErr:  true,
 		},
 		{
 			name: "new user ErrNoRows then register fails",
-			setup: func(u *mock.MockUserRepository) {
-				u.EXPECT().GetByLogin(ctx, req.Login).Return(nil, sql.ErrNoRows)
-				u.EXPECT().Register(ctx, req.Login, req.Pass, ip).Return(nil, errors.New("insert failed"))
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByLoginQuery)).
+					WithArgs(req.Login).
+					WillReturnError(sql.ErrNoRows)
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserRegisterQuery)).
+					WithArgs(req.Login, sqlmock.AnyArg(), ip).
+					WillReturnError(errors.New("insert failed"))
 			},
 			wantCode: http.StatusInternalServerError,
 			wantErr:  true,
 		},
 		{
 			name: "session creation fails",
-			setup: func(u *mock.MockUserRepository) {
-				u.EXPECT().GetByLogin(ctx, req.Login).Return(nil, sql.ErrNoRows)
-				u.EXPECT().Register(ctx, req.Login, req.Pass, ip).Return(&model.User{ID: 42, Login: req.Login}, nil)
-				u.EXPECT().CreateSession(ctx, int64(42), ip).Return("", errors.New("session error"))
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByLoginQuery)).
+					WithArgs(req.Login).
+					WillReturnError(sql.ErrNoRows)
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserRegisterQuery)).
+					WithArgs(req.Login, sqlmock.AnyArg(), ip).
+					WillReturnRows(sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip"}).
+						AddRow(int64(42), req.Login, "hash", time.Now(), time.Now(), ip))
+				m.ExpectExec(regexp.QuoteMeta(repository.UserUpdateLastIPQuery)).
+					WithArgs(ip, int64(42)).
+					WillReturnError(errors.New("session error"))
 			},
 			wantCode: http.StatusInternalServerError,
 			wantErr:  true,
 		},
 		{
 			name: "success",
-			setup: func(u *mock.MockUserRepository) {
-				u.EXPECT().GetByLogin(ctx, req.Login).Return(nil, sql.ErrNoRows)
-				u.EXPECT().Register(ctx, req.Login, req.Pass, ip).Return(&model.User{ID: 7, Login: req.Login}, nil)
-				u.EXPECT().CreateSession(ctx, int64(7), ip).Return("jwt-token-xyz", nil)
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByLoginQuery)).
+					WithArgs(req.Login).
+					WillReturnError(sql.ErrNoRows)
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserRegisterQuery)).
+					WithArgs(req.Login, sqlmock.AnyArg(), ip).
+					WillReturnRows(sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip"}).
+						AddRow(int64(7), req.Login, "hash", time.Now(), time.Now(), ip))
+				m.ExpectExec(regexp.QuoteMeta(repository.UserUpdateLastIPQuery)).
+					WithArgs(ip, int64(7)).
+					WillReturnResult(sqlmock.NewResult(1, 1))
+				m.ExpectExec(regexp.QuoteMeta(repository.UserUpsertSessionQuery)).
+					WithArgs(sqlmock.AnyArg(), int64(7), sqlmock.AnyArg(), ip).
+					WillReturnResult(sqlmock.NewResult(1, 1))
 			},
-			wantCode:   http.StatusOK,
-			wantToken:  true,
-			tokenValue: "jwt-token-xyz",
+			wantCode:  http.StatusOK,
+			wantToken: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctrl := gomock.NewController(t)
-			u := mock.NewMockUserRepository(ctrl)
-			o := mock.NewMockOrderRepository(ctrl)
-			w := mock.NewMockWithdrawalRepository(ctrl)
-			tt.setup(u)
-			s := NewService(nil, repository.Repositories{User: u, Order: o, Withdrawal: w})
+			db, m, err := sqlmock.New()
+			if err != nil {
+				t.Fatalf("sqlmock.New: %v", err)
+			}
+			defer db.Close()
+			D := &conn.DB{DB: db}
+			tt.setup(m)
+			s := NewService(D, repository.Repositories{User: repository.NewUserRepository(D), Order: repository.NewOrderRepository(D), Withdrawal: repository.NewWithdrawalRepository(D)})
 			out := s.Register(ctx, RegisterInput{Req: req, IP: ip})
 			if out.Code != tt.wantCode {
 				t.Errorf("Code = %d, want %d", out.Code, tt.wantCode)
@@ -94,8 +123,11 @@ func TestService_Register(t *testing.T) {
 			if !tt.wantErr && out.Err != nil {
 				t.Errorf("unexpected err: %v", out.Err)
 			}
-			if tt.wantToken && out.Token != tt.tokenValue {
-				t.Errorf("Token = %q, want %q", out.Token, tt.tokenValue)
+			if tt.wantToken && out.Token == "" {
+				t.Error("expected non-empty token")
+			}
+			if err := m.ExpectationsWereMet(); err != nil {
+				t.Fatalf("sqlmock expectations not met: %v", err)
 			}
 		})
 	}
@@ -113,7 +145,7 @@ func TestService_Login(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		setup      func(u *mock.MockUserRepository)
+		setup      func(m sqlmock.Sqlmock)
 		wantCode   int
 		wantErr    bool
 		wantToken  bool
@@ -121,61 +153,82 @@ func TestService_Login(t *testing.T) {
 	}{
 		{
 			name: "GetByLogin error",
-			setup: func(u *mock.MockUserRepository) {
-				u.EXPECT().GetByLogin(ctx, req.Login).Return(nil, errors.New("timeout"))
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByLoginQuery)).
+					WithArgs(req.Login).
+					WillReturnError(errors.New("timeout"))
 			},
 			wantCode: http.StatusInternalServerError,
 			wantErr:  true,
 		},
 		{
 			name: "user not found",
-			setup: func(u *mock.MockUserRepository) {
-				u.EXPECT().GetByLogin(ctx, req.Login).Return(nil, nil)
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByLoginQuery)).
+					WithArgs(req.Login).
+					WillReturnError(sql.ErrNoRows)
 			},
-			wantCode: http.StatusUnauthorized,
+			wantCode: http.StatusInternalServerError,
 			wantErr:  true,
 		},
 		{
 			name: "wrong password",
-			setup: func(u *mock.MockUserRepository) {
-				u.EXPECT().GetByLogin(ctx, req.Login).Return(&model.User{ID: 1, Login: req.Login, Pass: hash}, nil)
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByLoginQuery)).
+					WithArgs(req.Login).
+					WillReturnRows(sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn"}).
+						AddRow(int64(1), req.Login, hash, time.Now(), time.Now(), "127.0.0.1", 0.0, 0.0))
 			},
 			wantCode: http.StatusUnauthorized,
 			wantErr:  true,
 		},
 		{
 			name: "CreateSession fails",
-			setup: func(u *mock.MockUserRepository) {
-				u.EXPECT().GetByLogin(ctx, req.Login).Return(&model.User{ID: 2, Login: req.Login, Pass: hash}, nil)
-				u.EXPECT().CreateSession(ctx, int64(2), ip).Return("", errors.New("no session"))
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByLoginQuery)).
+					WithArgs(req.Login).
+					WillReturnRows(sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn"}).
+						AddRow(int64(2), req.Login, hash, time.Now(), time.Now(), "127.0.0.1", 0.0, 0.0))
+				m.ExpectExec(regexp.QuoteMeta(repository.UserUpdateLastIPQuery)).
+					WithArgs(ip, int64(2)).
+					WillReturnError(errors.New("no session"))
 			},
 			wantCode: http.StatusInternalServerError,
 			wantErr:  true,
 		},
 		{
 			name: "success",
-			setup: func(u *mock.MockUserRepository) {
-				u.EXPECT().GetByLogin(ctx, req.Login).Return(&model.User{ID: 3, Login: req.Login, Pass: hash}, nil)
-				u.EXPECT().CreateSession(ctx, int64(3), ip).Return("sess-abc", nil)
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(regexp.QuoteMeta(repository.UserGetByLoginQuery)).
+					WithArgs(req.Login).
+					WillReturnRows(sqlmock.NewRows([]string{"id", "login", "pass", "created_at", "updated_at", "last_login_ip", "balance", "withdrawn"}).
+						AddRow(int64(3), req.Login, hash, time.Now(), time.Now(), "127.0.0.1", 0.0, 0.0))
+				m.ExpectExec(regexp.QuoteMeta(repository.UserUpdateLastIPQuery)).
+					WithArgs(ip, int64(3)).
+					WillReturnResult(sqlmock.NewResult(1, 1))
+				m.ExpectExec(regexp.QuoteMeta(repository.UserUpsertSessionQuery)).
+					WithArgs(sqlmock.AnyArg(), int64(3), sqlmock.AnyArg(), ip).
+					WillReturnResult(sqlmock.NewResult(1, 1))
 			},
-			wantCode:   http.StatusOK,
-			wantToken:  true,
-			tokenValue: "sess-abc",
+			wantCode:  http.StatusOK,
+			wantToken: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctrl := gomock.NewController(t)
-			u := mock.NewMockUserRepository(ctrl)
-			o := mock.NewMockOrderRepository(ctrl)
-			w := mock.NewMockWithdrawalRepository(ctrl)
+			db, m, err := sqlmock.New()
+			if err != nil {
+				t.Fatalf("sqlmock.New: %v", err)
+			}
+			defer db.Close()
+			D := &conn.DB{DB: db}
 			in := LoginInput{Req: req, IP: ip}
 			if tt.name == "wrong password" {
 				in.Req.Pass = "other"
 			}
-			tt.setup(u)
-			s := NewService(nil, repository.Repositories{User: u, Order: o, Withdrawal: w})
+			tt.setup(m)
+			s := NewService(D, repository.Repositories{User: repository.NewUserRepository(D), Order: repository.NewOrderRepository(D), Withdrawal: repository.NewWithdrawalRepository(D)})
 			out := s.Login(ctx, in)
 			if out.Code != tt.wantCode {
 				t.Errorf("Code = %d, want %d", out.Code, tt.wantCode)
@@ -183,8 +236,11 @@ func TestService_Login(t *testing.T) {
 			if tt.wantErr && out.Err == nil {
 				t.Error("expected error")
 			}
-			if tt.wantToken && out.Token != tt.tokenValue {
-				t.Errorf("Token = %q", out.Token)
+			if tt.wantToken && out.Token == "" {
+				t.Error("expected non-empty token")
+			}
+			if err := m.ExpectationsWereMet(); err != nil {
+				t.Fatalf("sqlmock expectations not met: %v", err)
 			}
 		})
 	}

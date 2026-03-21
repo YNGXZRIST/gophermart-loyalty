@@ -17,7 +17,7 @@ import (
 const (
 	OrderGetOwnerQuery                  = `SELECT user_id FROM orders WHERE order_id = $1`
 	OrderAddOrderQuery                  = `INSERT INTO orders (user_id, order_id, status) VALUES ($1, $2, 'NEW')`
-	OrderGetByUidQuery                  = `SELECT id, order_id, status, accrual, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC`
+	OrderGetByUIDQuery                  = `SELECT id, order_id, status, accrual, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC`
 	OrderGetPendingOrdersWithLimitQuery = `SELECT id, order_id, user_id, status, created_at, updated_at FROM orders WHERE status IN ('NEW', 'PROCESSING') AND id > $1 ORDER BY id ASC LIMIT $2`
 	OrderUpdatePendingOrderQuery        = "UPDATE orders SET status = $1,accrual = $2 WHERE id = $3;"
 )
@@ -26,26 +26,19 @@ var ErrOrderExistsOwn = errors.New("order already exists for this user")
 
 var ErrOrderExistsOther = errors.New("order already exists for another user")
 
-type OrderRepository interface {
-	Add(ctx context.Context, userID int64, orderID string) error
-	GetByUserID(ctx context.Context, userID int64) ([]*model.Order, error)
-	GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order, error)
-	UpdateOrderAccrual(ctx context.Context, order *model.Order) error
-}
-
-type orderRepo struct {
+type OrderRepo struct {
 	repoBase
 	mgr *trmanager.Manager
 }
 
-func NewOrderRepository(db *conn.DB) OrderRepository {
-	return &orderRepo{
+func NewOrderRepository(db *conn.DB) *OrderRepo {
+	return &OrderRepo{
 		repoBase: repoBase{db: db},
 		mgr:      trmanager.NewManager(db),
 	}
 }
 
-func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error {
+func (r *OrderRepo) Add(ctx context.Context, userID int64, orderID string) error {
 	err := r.mgr.WithinTx(ctx, nil, func(ctx context.Context) error {
 		var ownerID sql.NullInt64
 		err := r.repoBase.q(ctx).QueryRowContext(ctx, OrderGetOwnerQuery, orderID).Scan(&ownerID)
@@ -73,10 +66,10 @@ func (r *orderRepo) Add(ctx context.Context, userID int64, orderID string) error
 	return nil
 }
 
-func (r *orderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Order, error) {
+func (r *OrderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Order, error) {
 	var list []*model.Order
 	rows, err := r.repoBase.q(ctx).QueryContext(ctx,
-		OrderGetByUidQuery,
+		OrderGetByUIDQuery,
 		userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -104,7 +97,7 @@ func (r *orderRepo) GetByUserID(ctx context.Context, userID int64) ([]*model.Ord
 	return list, nil
 }
 
-func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order, error) {
+func (r *OrderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order, error) {
 	var lastID int64
 	const chunkSize = 1
 	var list []*model.Order
@@ -144,7 +137,7 @@ func (r *orderRepo) GetOrdersPendingAccrual(ctx context.Context) ([]*model.Order
 	}
 	return list, nil
 }
-func (r *orderRepo) UpdateOrderAccrual(ctx context.Context, order *model.Order) error {
+func (r *OrderRepo) UpdateOrderAccrual(ctx context.Context, order *model.Order) error {
 
 	_, err := r.repoBase.q(ctx).ExecContext(ctx, OrderUpdatePendingOrderQuery, order.Status, order.Accrual, order.ID)
 	if err != nil {

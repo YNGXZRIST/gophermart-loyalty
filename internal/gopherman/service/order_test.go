@@ -5,12 +5,13 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
+	"gophermart-loyalty/internal/gopherman/db/conn"
 	"gophermart-loyalty/internal/gopherman/model"
 	"gophermart-loyalty/internal/gopherman/repository"
-	"gophermart-loyalty/internal/gopherman/repository/mock"
 
-	"github.com/golang/mock/gomock"
+	"github.com/DATA-DOG/go-sqlmock"
 )
 
 func TestService_GetOrders(t *testing.T) {
@@ -21,31 +22,38 @@ func TestService_GetOrders(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		setup    func(o *mock.MockOrderRepository)
+		setup    func(m sqlmock.Sqlmock)
 		wantCode int
 		wantLen  int
 		wantErr  bool
 	}{
 		{
 			name: "repository error",
-			setup: func(o *mock.MockOrderRepository) {
-				o.EXPECT().GetByUserID(ctx, uid).Return(nil, errors.New("query failed"))
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(repository.OrderGetByUIDQuery).WithArgs(uid).WillReturnError(errors.New("query failed"))
 			},
 			wantCode: http.StatusInternalServerError,
 			wantErr:  true,
 		},
 		{
 			name: "success empty",
-			setup: func(o *mock.MockOrderRepository) {
-				o.EXPECT().GetByUserID(ctx, uid).Return([]*model.Order{}, nil)
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(repository.OrderGetByUIDQuery).
+					WithArgs(uid).
+					WillReturnRows(sqlmock.NewRows([]string{"id", "order_id", "status", "accrual", "created_at", "updated_at"}))
 			},
 			wantCode: http.StatusOK,
 			wantLen:  0,
 		},
 		{
 			name: "success with orders",
-			setup: func(o *mock.MockOrderRepository) {
-				o.EXPECT().GetByUserID(ctx, uid).Return(orders, nil)
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectQuery(repository.OrderGetByUIDQuery).
+					WithArgs(uid).
+					WillReturnRows(
+						sqlmock.NewRows([]string{"id", "order_id", "status", "accrual", "created_at", "updated_at"}).
+							AddRow(int64(1), orders[0].OrderID, orders[0].Status, 0.0, time.Now(), time.Now()),
+					)
 			},
 			wantCode: http.StatusOK,
 			wantLen:  1,
@@ -54,12 +62,17 @@ func TestService_GetOrders(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctrl := gomock.NewController(t)
-			u := mock.NewMockUserRepository(ctrl)
-			o := mock.NewMockOrderRepository(ctrl)
-			w := mock.NewMockWithdrawalRepository(ctrl)
-			tt.setup(o)
-			s := NewService(nil, repository.Repositories{User: u, Order: o, Withdrawal: w})
+			db, m, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			if err != nil {
+				t.Fatalf("sqlmock.New: %v", err)
+			}
+			defer db.Close()
+			D := &conn.DB{DB: db}
+			u := repository.NewUserRepository(D)
+			o := repository.NewOrderRepository(D)
+			w := repository.NewWithdrawalRepository(D)
+			tt.setup(m)
+			s := NewService(D, repository.Repositories{User: u, Order: o, Withdrawal: w})
 			out := s.GetOrders(ctx, GetOrdersInput{UserID: uid})
 			if out.Code != tt.wantCode {
 				t.Errorf("Code = %d", out.Code)
@@ -69,6 +82,9 @@ func TestService_GetOrders(t *testing.T) {
 			}
 			if !tt.wantErr && len(out.Orders) != tt.wantLen {
 				t.Errorf("len(Orders) = %d, want %d", len(out.Orders), tt.wantLen)
+			}
+			if err := m.ExpectationsWereMet(); err != nil {
+				t.Fatalf("sqlmock expectations not met: %v", err)
 			}
 		})
 	}
@@ -83,7 +99,7 @@ func TestService_AddOrder(t *testing.T) {
 	tests := []struct {
 		name     string
 		in       AddOrderInput
-		setup    func(o *mock.MockOrderRepository)
+		setup    func(m sqlmock.Sqlmock)
 		wantCode int
 		wantErr  bool
 	}{
@@ -102,16 +118,24 @@ func TestService_AddOrder(t *testing.T) {
 		{
 			name: "already own order returns 200",
 			in:   AddOrderInput{UserID: uid, OrderID: validOrder},
-			setup: func(o *mock.MockOrderRepository) {
-				o.EXPECT().Add(ctx, uid, validOrder).Return(repository.ErrOrderExistsOwn)
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectBegin()
+				m.ExpectQuery(repository.OrderGetOwnerQuery).
+					WithArgs(validOrder).
+					WillReturnRows(sqlmock.NewRows([]string{"user_id"}).AddRow(uid))
+				m.ExpectRollback()
 			},
 			wantCode: http.StatusOK,
 		},
 		{
 			name: "other user order conflict",
 			in:   AddOrderInput{UserID: uid, OrderID: validOrder},
-			setup: func(o *mock.MockOrderRepository) {
-				o.EXPECT().Add(ctx, uid, validOrder).Return(repository.ErrOrderExistsOther)
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectBegin()
+				m.ExpectQuery(repository.OrderGetOwnerQuery).
+					WithArgs(validOrder).
+					WillReturnRows(sqlmock.NewRows([]string{"user_id"}).AddRow(uid + 1))
+				m.ExpectRollback()
 			},
 			wantCode: http.StatusConflict,
 			wantErr:  true,
@@ -119,8 +143,12 @@ func TestService_AddOrder(t *testing.T) {
 		{
 			name: "generic add error",
 			in:   AddOrderInput{UserID: uid, OrderID: validOrder},
-			setup: func(o *mock.MockOrderRepository) {
-				o.EXPECT().Add(ctx, uid, validOrder).Return(errors.New("db"))
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectBegin()
+				m.ExpectQuery(repository.OrderGetOwnerQuery).
+					WithArgs(validOrder).
+					WillReturnError(sqlmock.ErrCancelled)
+				m.ExpectRollback()
 			},
 			wantCode: http.StatusInternalServerError,
 			wantErr:  true,
@@ -128,8 +156,15 @@ func TestService_AddOrder(t *testing.T) {
 		{
 			name: "accepted new order",
 			in:   AddOrderInput{UserID: uid, OrderID: validOrder},
-			setup: func(o *mock.MockOrderRepository) {
-				o.EXPECT().Add(ctx, uid, validOrder).Return(nil)
+			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectBegin()
+				m.ExpectQuery(repository.OrderGetOwnerQuery).
+					WithArgs(validOrder).
+					WillReturnRows(sqlmock.NewRows([]string{"user_id"}))
+				m.ExpectExec(repository.OrderAddOrderQuery).
+					WithArgs(uid, validOrder).
+					WillReturnResult(sqlmock.NewResult(1, 1))
+				m.ExpectCommit()
 			},
 			wantCode: http.StatusAccepted,
 		},
@@ -137,14 +172,19 @@ func TestService_AddOrder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			ctrl := gomock.NewController(t)
-			u := mock.NewMockUserRepository(ctrl)
-			o := mock.NewMockOrderRepository(ctrl)
-			w := mock.NewMockWithdrawalRepository(ctrl)
-			if tt.setup != nil {
-				tt.setup(o)
+			db, m, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+			if err != nil {
+				t.Fatalf("sqlmock.New: %v", err)
 			}
-			s := NewService(nil, repository.Repositories{User: u, Order: o, Withdrawal: w})
+			defer db.Close()
+			D := &conn.DB{DB: db}
+			u := repository.NewUserRepository(D)
+			o := repository.NewOrderRepository(D)
+			w := repository.NewWithdrawalRepository(D)
+			if tt.setup != nil {
+				tt.setup(m)
+			}
+			s := NewService(D, repository.Repositories{User: u, Order: o, Withdrawal: w})
 			resp := s.AddOrder(ctx, tt.in)
 			if resp.Code != tt.wantCode {
 				t.Errorf("Code = %d, want %d", resp.Code, tt.wantCode)
@@ -154,6 +194,9 @@ func TestService_AddOrder(t *testing.T) {
 			}
 			if !tt.wantErr && resp.Err != nil {
 				t.Errorf("unexpected err: %v", resp.Err)
+			}
+			if err := m.ExpectationsWereMet(); err != nil {
+				t.Fatalf("sqlmock expectations not met: %v", err)
 			}
 		})
 	}
