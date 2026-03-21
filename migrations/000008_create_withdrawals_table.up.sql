@@ -8,8 +8,3 @@ CREATE TABLE IF NOT EXISTS withdrawals (
 );
 
 CREATE INDEX withdrawals_user_id_idx ON withdrawals (user_id);
-
-CREATE TRIGGER withdrawals_updated_at
-    BEFORE UPDATE ON withdrawals
-    FOR EACH ROW
-    EXECUTE PROCEDURE set_updated_at();

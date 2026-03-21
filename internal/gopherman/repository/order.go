@@ -18,7 +18,7 @@ const (
 	OrderAddOrderQuery                  = `INSERT INTO orders (user_id, order_id, status) VALUES ($1, $2, 'NEW')`
 	OrderGetByUIDQuery                  = `SELECT id, order_id, status, accrual, created_at, updated_at FROM orders WHERE user_id = $1 ORDER BY created_at DESC`
 	OrderGetPendingOrdersWithLimitQuery = `SELECT id, order_id, user_id, status, created_at, updated_at FROM orders WHERE status IN ('NEW', 'PROCESSING') AND id > $1 ORDER BY id ASC LIMIT $2`
-	OrderUpdatePendingOrderQuery        = "UPDATE orders SET status = $1,accrual = $2 WHERE id = $3;"
+	OrderUpdatePendingOrderQuery        = "UPDATE orders SET status = $1,accrual = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3;"
 )
 
 var ErrOrderExistsOwn = errors.New("order already exists for this user")

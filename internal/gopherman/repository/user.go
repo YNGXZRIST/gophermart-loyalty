@@ -30,15 +30,15 @@ const (
 	UserGetByLoginQuery    = "SELECT id, login, pass, created_at, updated_at, last_login_ip, balance, withdrawn FROM users WHERE login=$1"
 	UserGetByIDQuery       = "SELECT id, login, pass, created_at, updated_at, last_login_ip, balance, withdrawn FROM users WHERE id=$1"
 	UserRegisterQuery      = "INSERT INTO users(login, pass, last_login_ip) VALUES ($1, $2, $3) RETURNING id, login, pass, created_at, updated_at, last_login_ip"
-	UserUpdateLastIPQuery  = "UPDATE users SET last_login_ip=$1 where id=$2"
+	UserUpdateLastIPQuery  = "UPDATE users SET last_login_ip=$1, updated_at = CURRENT_TIMESTAMP where id=$2"
 	UserUpsertSessionQuery = `INSERT INTO sessions (token_hash, user_id, expires_at, ip) VALUES ($1, $2, $3, $4)
 		 ON CONFLICT (user_id, ip) DO UPDATE SET
 		   token_hash = EXCLUDED.token_hash,
 		   expires_at = EXCLUDED.expires_at`
 	UserUserIDFromSessionQuery = "SELECT user_id, expires_at, ip, created_at FROM sessions WHERE token_hash = $1 AND expires_at > CURRENT_TIMESTAMP"
 
-	UserIncrementWithdrawnQuery = `UPDATE users SET balance = $1,withdrawn = $2  WHERE id = $3`
-	UserIncrementBalanceQuery   = "UPDATE users SET balance = $1 WHERE id = $2;"
+	UserIncrementWithdrawnQuery = `UPDATE users SET balance = $1,withdrawn = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`
+	UserIncrementBalanceQuery   = "UPDATE users SET balance = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;"
 )
 
 func NewUserRepository(db *conn.DB) *UserRepo {

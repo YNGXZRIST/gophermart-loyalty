@@ -11,8 +11,3 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 
 CREATE INDEX orders_user_id_idx ON orders (user_id);
-
-CREATE TRIGGER orders_updated_at
-    BEFORE UPDATE ON orders
-    FOR EACH ROW
-    EXECUTE PROCEDURE set_updated_at();
