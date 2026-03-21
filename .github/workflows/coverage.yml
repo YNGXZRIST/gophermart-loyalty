@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           # cmd/statictest — отдельная утилита для statictest, тестов нет
-          go test $$(go list ./... | grep -v '/cmd/statictest$$') \
+          go list ./... | grep -v '/cmd/statictest$$' | xargs -r go test \
             -coverprofile=cover.out -covermode=atomic -coverpkg=./...
           go tool cover -func=cover.out
 
