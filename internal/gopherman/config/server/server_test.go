@@ -1,6 +1,7 @@
 package server
 
 import (
+	"gophermart-loyalty/internal/gopherman/logger"
 	"reflect"
 	"testing"
 )
@@ -14,6 +15,7 @@ func TestNewConfig(t *testing.T) {
 		t.Setenv("RUN_ADDRESS", ":8080")
 		t.Setenv("DATABASE_URI", "postgres://localhost/gophermart")
 		t.Setenv("ACCRUAL_SYSTEM_ADDRESS", "http://accrual:8080")
+		t.Setenv("ACCRUAL_WORKER_COUNT", "3")
 		got, err := NewConfig([]string{})
 		if err != nil {
 			t.Errorf("NewConfig() error = %v", err)
@@ -23,6 +25,8 @@ func TestNewConfig(t *testing.T) {
 		want.Address = ":8080"
 		want.DatabaseURL = "postgres://localhost/gophermart"
 		want.AccrualAddress = "http://accrual:8080"
+		want.Mode = logger.TypeModeDevelopment
+		want.AccrualWorkerCount = 3
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("NewConfig() got = %+v, want %+v", got, want)
 		}

@@ -1,9 +1,9 @@
+// Package logger builds configured zap loggers for app commands.
 package logger
 
 import (
 	"errors"
 	"fmt"
-	"gophermart-loyalty/internal/gopherman/constant"
 	"os"
 	"strings"
 
@@ -11,15 +11,28 @@ import (
 )
 
 const logDir = "logs/"
+const (
+	// TypeModeProduction enables production logger configuration.
+	TypeModeProduction = "production"
+	// TypeModeDevelopment enables development logger configuration.
+	TypeModeDevelopment = "development"
+	// TypeModeTest enables development-style logger for tests.
+	TypeModeTest = "test"
+)
+const (
+	// ServerLgr is default logger name for HTTP server command.
+	ServerLgr = "server"
+)
 
+// Initialize creates logger by mode and command type.
 func Initialize(mode, cmdType string) (*zap.Logger, error) {
 	var err error
 	var log *zap.Logger
 	mode = strings.TrimSpace(mode)
 	switch mode {
-	case constant.TypeModeProduction:
+	case TypeModeProduction:
 		log, err = createProductionLogger(cmdType)
-	case constant.TypeModeDevelopment, constant.TypeModeTest:
+	case TypeModeDevelopment, TypeModeTest:
 		log, err = createDevelopmentLogger()
 	default:
 		err = errors.New("invalid mode")

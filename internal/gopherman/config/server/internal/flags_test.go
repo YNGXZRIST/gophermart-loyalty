@@ -120,6 +120,15 @@ func TestOptions_parseEnv(t *testing.T) {
 }
 
 func Test_parseArgs(t *testing.T) {
+	defaultOpts := func(addr, dbURL, accrual string) *Options {
+		return &Options{
+			Address:            addr,
+			DatabaseURL:        dbURL,
+			AccrualAddress:     accrual,
+			Mode:               TypeModeDefault,
+			AccrualWorkerCount: AccrualWorkerCountDefault,
+		}
+	}
 	tests := []struct {
 		name    string
 		args    []string
@@ -129,31 +138,31 @@ func Test_parseArgs(t *testing.T) {
 		{
 			name:    "defaults",
 			args:    []string{},
-			want:    &Options{Address: "localhost", DatabaseURL: "", AccrualAddress: ""},
+			want:    defaultOpts("localhost", "", ""),
 			wantErr: false,
 		},
 		{
 			name:    "flag -a",
 			args:    []string{"-a", ":8080"},
-			want:    &Options{Address: ":8080", DatabaseURL: "", AccrualAddress: ""},
+			want:    defaultOpts(":8080", "", ""),
 			wantErr: false,
 		},
 		{
 			name:    "flag -d",
 			args:    []string{"-d", "postgres://localhost/db"},
-			want:    &Options{Address: "localhost", DatabaseURL: "postgres://localhost/db", AccrualAddress: ""},
+			want:    defaultOpts("localhost", "postgres://localhost/db", ""),
 			wantErr: false,
 		},
 		{
 			name:    "flag -db (currently binds to DatabaseURL)",
 			args:    []string{"-db", "postgres://other/db"},
-			want:    &Options{Address: "localhost", DatabaseURL: "postgres://other/db", AccrualAddress: ""},
+			want:    defaultOpts("localhost", "postgres://other/db", ""),
 			wantErr: false,
 		},
 		{
 			name:    "all flags",
 			args:    []string{"-a", "0.0.0.0:8080", "-d", "postgres://user:pass@host/db"},
-			want:    &Options{Address: "0.0.0.0:8080", DatabaseURL: "postgres://user:pass@host/db", AccrualAddress: ""},
+			want:    defaultOpts("0.0.0.0:8080", "postgres://user:pass@host/db", ""),
 			wantErr: false,
 		},
 		{

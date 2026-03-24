@@ -1,3 +1,4 @@
+// Package migrations applies embedded SQL migrations.
 package migrations
 
 import (
@@ -11,9 +12,12 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
+// FS contains embedded SQL migration files.
+//
 //go:embed *sql
 var FS embed.FS
 
+// Migrate applies all up migrations to target database DSN.
 func Migrate(dns string) error {
 	if dns == "" {
 		return fmt.Errorf("database DSN is not set")

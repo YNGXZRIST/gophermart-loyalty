@@ -1,0 +1,10 @@
+profile: cover.out
+
+threshold:
+  total: 60
+  package: 0
+  file: 0
+
+exclude:
+  paths:
+    - ^cmd/statictest

@@ -3,6 +3,7 @@ package httpcompressor
 import (
 	"bytes"
 	"compress/gzip"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -23,8 +24,8 @@ func TestNewGzipWriter(t *testing.T) {
 	if err := cw.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
-	if got := recorder.Header().Get(ContentEncodingHeader); got != GzipEncoding {
-		t.Errorf("Content-Encoding = %v, want %v", got, GzipEncoding)
+	if got := recorder.Header().Get(constant.ContentEncodingHeader); got != constant.GzipEncoding {
+		t.Errorf("Content-Encoding = %v, want %v", got, constant.GzipEncoding)
 	}
 
 	body := recorder.Body.Bytes()
@@ -85,16 +86,16 @@ func TestGzipWriter_IntegrationWithHTTP(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cw := NewGzipWriter(w)
 		defer cw.Close()
-		w.Header().Set(ContentTypeHeader, ApplicationJSON)
+		w.Header().Set(constant.ContentTypeHeader, constant.ApplicationJSON)
 		cw.Write([]byte(`{"message":"hello"}`))
 	})
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set(AcceptEncodingHeader, GzipEncoding)
+	req.Header.Set(constant.AcceptEncodingHeader, constant.GzipEncoding)
 	recorder := httptest.NewRecorder()
 
 	handler.ServeHTTP(recorder, req)
-	if got := recorder.Header().Get(ContentEncodingHeader); got != GzipEncoding {
-		t.Errorf("Content-Encoding = %v, want %v", got, GzipEncoding)
+	if got := recorder.Header().Get(constant.ContentEncodingHeader); got != constant.GzipEncoding {
+		t.Errorf("Content-Encoding = %v, want %v", got, constant.GzipEncoding)
 	}
 	body := recorder.Body.Bytes()
 	if len(body) < 2 || body[0] != 0x1f || body[1] != 0x8b {
@@ -110,7 +111,7 @@ func TestGzipReader_IntegrationWithHTTP(t *testing.T) {
 	gw.Close()
 	compressedData := buf.Bytes()
 	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(compressedData))
-	req.Header.Set(ContentEncodingHeader, GzipEncoding)
+	req.Header.Set(constant.ContentEncodingHeader, constant.GzipEncoding)
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cr, err := NewGzipReader(r.Body)
 		if err != nil {

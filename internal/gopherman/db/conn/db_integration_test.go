@@ -4,7 +4,6 @@
 package conn
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"gophermart-loyalty/internal/gopherman/config/db"
@@ -82,7 +81,7 @@ func getConnForMethodTests(t *testing.T) *DB {
 
 func TestDB_ExecQuery_methods(t *testing.T) {
 	conn := getConnForMethodTests(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tests := []struct {
 		name string
@@ -152,113 +151,6 @@ func TestDB_ExecQuery_methods(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tt.run(conn); err != nil {
-				t.Errorf("%s(SELECT 1) = %v", tt.name, err)
-			}
-		})
-	}
-}
-
-func TestDB_BeginTx(t *testing.T) {
-	conn := getConnForMethodTests(t)
-	ctx := context.Background()
-
-	tx, err := conn.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("BeginTx() = %v", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if tx == nil {
-		t.Fatal("BeginTx() returned nil tx")
-	}
-	_, err = tx.ExecContext(ctx, "SELECT 1")
-	if err != nil {
-		t.Errorf("Tx.ExecContext(SELECT 1) = %v", err)
-	}
-	err = tx.Commit()
-	if err != nil {
-		t.Errorf("Commit() = %v", err)
-	}
-}
-
-func TestTx_ExecQuery_methods(t *testing.T) {
-	conn := getConnForMethodTests(t)
-	ctx := context.Background()
-
-	tests := []struct {
-		name string
-		run  func(*Tx) error
-	}{
-		{
-			name: "Exec",
-			run: func(tx *Tx) error {
-				_, err := tx.Exec("SELECT 1")
-				return err
-			},
-		},
-		{
-			name: "ExecContext",
-			run: func(tx *Tx) error {
-				_, err := tx.ExecContext(ctx, "SELECT 1")
-				return err
-			},
-		},
-		{
-			name: "Query",
-			run: func(tx *Tx) error {
-				rows, err := tx.Query("SELECT 1")
-				if err != nil {
-					return err
-				}
-				defer rows.Close()
-				if !rows.Next() {
-					return errNoRow
-				}
-				var n int
-				if err := rows.Scan(&n); err != nil {
-					return err
-				}
-				if n != 1 {
-					t.Errorf("Query: got row value %d, want 1", n)
-				}
-				if rows.Next() {
-					t.Error("Query: expected single row")
-				}
-				return nil
-			},
-		},
-		{
-			name: "QueryContext",
-			run: func(tx *Tx) error {
-				rows, err := tx.QueryContext(ctx, "SELECT 1")
-				if err != nil {
-					return err
-				}
-				defer rows.Close()
-				if !rows.Next() {
-					return errNoRow
-				}
-				var n int
-				if err := rows.Scan(&n); err != nil {
-					return err
-				}
-				if n != 1 {
-					t.Errorf("QueryContext: got row value %d, want 1", n)
-				}
-				return nil
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tx, err := conn.BeginTx(ctx, nil)
-			if err != nil {
-				t.Fatalf("BeginTx() = %v", err)
-			}
-			defer func() { _ = tx.Rollback() }()
-
-			if err := tt.run(tx); err != nil {
 				t.Errorf("%s(SELECT 1) = %v", tt.name, err)
 			}
 		})

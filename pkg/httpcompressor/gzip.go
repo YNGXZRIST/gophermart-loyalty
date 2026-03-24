@@ -1,19 +1,14 @@
+// Package httpcompressor contains reusable HTTP gzip wrappers.
 package httpcompressor
 
 import (
 	"compress/gzip"
+	"gophermart-loyalty/internal/gopherman/constant"
 	"io"
 	"net/http"
 )
 
-const (
-	ContentEncodingHeader = "Content-Encoding"
-	AcceptEncodingHeader  = "Accept-Encoding"
-	GzipEncoding          = "gzip"
-	ContentTypeHeader     = "Content-Type"
-	ApplicationJSON       = "application/json"
-)
-
+// NewGzipReader wraps body with gzip reader.
 func NewGzipReader(r io.ReadCloser) (*CompressReader, error) {
 	gr, err := gzip.NewReader(r)
 	if err != nil {
@@ -22,7 +17,8 @@ func NewGzipReader(r io.ReadCloser) (*CompressReader, error) {
 	return newCompressReader(r, gr)
 }
 
+// NewGzipWriter wraps response writer with gzip compressor.
 func NewGzipWriter(w http.ResponseWriter) *CompressWriter {
 	gw := gzip.NewWriter(w)
-	return newCompressWriter(w, gw, GzipEncoding)
+	return newCompressWriter(w, gw, constant.GzipEncoding)
 }

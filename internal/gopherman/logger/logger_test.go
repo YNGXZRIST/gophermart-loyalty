@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"gophermart-loyalty/internal/gopherman/constant"
 	"testing"
 )
 
@@ -18,16 +17,16 @@ func TestInitialize(t *testing.T) {
 		{
 			name: "initialize logger in dev mode for server",
 			args: args{
-				mode:    constant.TypeModeTest,
-				cmdType: constant.ServerType,
+				mode:    TypeModeTest,
+				cmdType: ServerLgr,
 			},
 			wantErr: false,
 		},
 		{
 			name: "initialize logger in prod mode for server",
 			args: args{
-				mode:    constant.TypeModeProduction,
-				cmdType: constant.ServerType,
+				mode:    TypeModeProduction,
+				cmdType: ServerLgr,
 			},
 			wantErr: false,
 		},
@@ -35,7 +34,7 @@ func TestInitialize(t *testing.T) {
 			name: "initialize logger with invalid mode",
 			args: args{
 				mode:    "invalid_mode",
-				cmdType: constant.ServerType,
+				cmdType: ServerLgr,
 			},
 			wantErr: true,
 		},
@@ -66,7 +65,7 @@ func Test_createProductionLogger(t *testing.T) {
 		{
 			name: "create production logger for server",
 			args: args{
-				cmdType: constant.ServerType,
+				cmdType: ServerLgr,
 			},
 			wantErr: false,
 		},

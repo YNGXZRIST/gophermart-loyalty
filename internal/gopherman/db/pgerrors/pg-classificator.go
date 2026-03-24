@@ -1,3 +1,4 @@
+// Package pgerrors classifies and wraps PostgreSQL errors.
 package pgerrors
 
 import (
@@ -7,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// PGErrorClassification defines retry strategy for postgres errors.
 type PGErrorClassification int
 
 const (
@@ -17,8 +19,10 @@ const (
 	Retriable
 )
 
+// PostgresErrorClassifier classifies postgres errors as retriable/non-retriable.
 type PostgresErrorClassifier struct{}
 
+// NewPostgresErrorClassifier creates a postgres error classifier.
 func NewPostgresErrorClassifier() *PostgresErrorClassifier {
 	return &PostgresErrorClassifier{}
 }
@@ -35,6 +39,7 @@ func (c *PostgresErrorClassifier) Classify(err error) PGErrorClassification {
 	return NonRetriable
 }
 
+// СlassifyPgError maps postgres SQLSTATE code to retry classification.
 func СlassifyPgError(pgErr *pgconn.PgError) PGErrorClassification {
 
 	switch pgErr.Code {

@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: gophermart-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gophermart
+      POSTGRES_USER: gophermart
+      POSTGRES_PASSWORD: gophermart
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: gophermart-app
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      RUN_ADDRESS: ":8080"
+      DATABASE_URI: "postgres://gophermart:gophermart@db:5432/gophermart?sslmode=disable"
+      ACCRUAL_SYSTEM_ADDRESS: "http://accrual:8080"
+      MODE: "release"
+      ACCRUAL_WORKER_COUNT: "4"
+      ACCRUAL_USE_MOCK: "true"
+    ports:
+      - "8080:8080"
+
+  # Optional mock accrual system (you can replace with real one)
+  accrual:
+    image: nginx:alpine
+    container_name: accrual-mock
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+
+volumes:
+  db_data:
